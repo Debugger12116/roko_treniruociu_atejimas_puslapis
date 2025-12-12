@@ -4,7 +4,7 @@ const ADMIN_PASS = "rokas123";
 const LT_DAYS = ["Pirmadienis", "Antradienis", "Trečiadienis", "Ketvirtadienis", "Penktadienis", "Šeštadienis", "Sekmadienis"];
 const LT_MONTHS = ["Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis", "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"];
 
-// Nuoroda į šriftą internete (Roboto), kuris palaiko lietuviškas raides
+// Nuoroda į šriftą
 const FONT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
 
 let attendanceData = {};
@@ -224,7 +224,6 @@ function togglePdfInputs() {
     else if (type === 'year') { mGroup.classList.add('hidden'); }
 }
 
-// Funkcija lietuviškų raidžių šalinimui (jei nepavyksta įkelti šrifto)
 function sanitizeText(str) {
     const map = {
         'ą':'a', 'č':'c', 'ę':'e', 'ė':'e', 'į':'i', 'š':'s', 'ų':'u', 'ū':'u', 'ž':'z',
@@ -233,7 +232,6 @@ function sanitizeText(str) {
     return str.replace(/[ąčęėįšųūžĄČĘĖĮŠŲŪŽ]/g, match => map[match]);
 }
 
-// Funkcija šrifto atsisiuntimui
 async function loadFont(url) {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("Šriftas nepasiekiamas");
@@ -245,13 +243,14 @@ async function loadFont(url) {
     });
 }
 
+// PAGRINDINĖ FUNKCIJA PDF GENERAVIMUI
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     let fontLoaded = false;
 
-    // 1. Bandome įkelti šriftą iš interneto (CDN)
+    // 1. Šrifto krovimas
     try {
         const fontBase64 = await loadFont(FONT_URL);
         doc.addFileToVFS("Roboto-Regular.ttf", fontBase64);
@@ -259,31 +258,22 @@ async function generatePDF() {
         doc.setFont("Roboto");
         fontLoaded = true;
     } catch (e) {
-        console.warn("Nepavyko įkelti šrifto. Naudojamas standartinis (be LT raidžių).");
+        console.warn("Šriftas nerastas, naudojamas atsarginis.");
     }
 
     const type = document.getElementById('pdf-type').value;
     const year = parseInt(document.getElementById('pdf-year').value);
     const month = parseInt(document.getElementById('pdf-month').value);
     
-    // Antraštės
-    const title = fontLoaded ? "Lankomumo Ataskaita" : sanitizeText("Lankomumo Ataskaita");
-    let subtitle = "";
-    let showNote = false;
+    // Pagalbinė funkcija tekstui
+    const txt = (t) => fontLoaded ? t : sanitizeText(t);
 
-    if (type === 'all') {
-        subtitle = "Viso laiko statistika";
-        showNote = true;
-    } else if (type === 'year') {
-        subtitle = `${year} metų statistika`;
-        if (year === 2025) showNote = true;
-    } else {
-        subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`;
-        if (year === 2025 && month === 10) showNote = true;
-    }
-    if (!fontLoaded) subtitle = sanitizeText(subtitle);
+    // 2. Statistikos paruošimas PDF laikotarpiui
+    let pdfStats = {
+        treniruote: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) },
+        rungtynes: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) }
+    };
 
-    // Duomenų filtravimas
     const rows = [];
     Object.keys(attendanceData).sort().forEach(date => {
         const d = new Date(date);
@@ -294,56 +284,122 @@ async function generatePDF() {
 
         if (include) {
             const rec = attendanceData[date];
-            let tDay = LT_DAYS[(d.getDay() + 6) % 7];
-            let tType = rec.type === 'treniruote' ? 'Treniruotė' : 'Rungtynės';
-            let tStatus = rec.present ? "Taip" : "Ne";
+            const dayIdx = (d.getDay() + 6) % 7;
+            const tType = rec.type === 'treniruote' ? 'treniruote' : 'rungtynes';
 
-            // Jei šriftas neįsikrovė, nuimame lietuviškas raides, kad nenukirstų teksto
-            if (!fontLoaded) {
-                tDay = sanitizeText(tDay);
-                tType = sanitizeText(tType); // Treniruotė -> Treniruote
-                tStatus = sanitizeText(tStatus);
+            // Skaičiuojame statistiką
+            pdfStats[tType].total++;
+            pdfStats[tType].days[dayIdx].t++;
+            if(rec.present) {
+                pdfStats[tType].present++;
+                pdfStats[tType].days[dayIdx].p++;
             }
-            rows.push([date, tDay, tType, tStatus]);
+
+            // Ruošiame eilutę detaliai lentelei
+            rows.push([
+                date, 
+                txt(LT_DAYS[dayIdx]), 
+                txt(rec.type === 'treniruote' ? 'Treniruotė' : 'Rungtynės'), 
+                txt(rec.present ? "Taip" : "Ne")
+            ]);
         }
     });
 
-    // PDF generavimas
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFontSize(18);
-    doc.text(title, pageWidth/2, 15, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text(subtitle, pageWidth/2, 22, { align: 'center' });
-    doc.setFontSize(11);
-    const name = fontLoaded ? "Rokas Šipkauskas" : "Rokas Sipkauskas";
-    doc.text(name, pageWidth/2, 29, { align: 'center' });
+    // 3. Antraštės
+    let subtitle = "";
+    let showNote = false;
+    if (type === 'all') { subtitle = "Viso laiko statistika"; showNote = true; }
+    else if (type === 'year') { subtitle = `${year} metų statistika`; if(year===2025) showNote=true; }
+    else { subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`; if(year===2025 && month===10) showNote=true; }
 
-    let startY = 35;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(18); doc.text(txt("Lankomumo Ataskaita"), pageWidth/2, 15, { align: 'center' });
+    doc.setFontSize(14); doc.text(txt(subtitle), pageWidth/2, 22, { align: 'center' });
+    doc.setFontSize(11); doc.text(txt("Rokas Šipkauskas"), pageWidth/2, 29, { align: 'center' });
+
+    let currentY = 35;
     if (showNote) {
-        doc.setTextColor(200, 0, 0);
-        doc.setFontSize(10);
-        const note = fontLoaded ? "* Duomenys pradėti skaičiuoti nuo 2025-10-06" : "* Duomenys pradeti skaiciuoti nuo 2025-10-06";
-        doc.text(note, pageWidth/2, startY, { align: 'center' });
-        doc.setTextColor(0,0,0);
-        startY += 10;
-    }
+        doc.setTextColor(200, 0, 0); doc.setFontSize(10);
+        doc.text(txt("* Duomenys pradėti skaičiuoti nuo 2025-10-06"), pageWidth/2, currentY, { align: 'center' });
+        doc.setTextColor(0,0,0); currentY += 10;
+    } else { currentY += 5; }
+
+    // 4. STATISTIKOS LENTELĖS (Kaip nuotraukoje)
+    
+    // Helper funkcija suvestinėms
+    const drawSummaryTable = (title, dataKey) => {
+        const s = pdfStats[dataKey];
+        const missed = s.total - s.present;
+        const pct = s.total ? ((s.present/s.total)*100).toFixed(1) : "0.0";
+        
+        doc.autoTable({
+            startY: currentY,
+            head: [[txt('Rodiklis'), txt('Duomenys')]],
+            body: [
+                [txt('Įvykių skaičius'), s.total],
+                [txt('Dalyvauta'), s.present],
+                [txt('Praleista'), missed],
+                [txt('Lankomumo procentas'), pct + " %"]
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [100, 255, 255], textColor: [0,0,0], halign: 'left' }, // Cyan
+            bodyStyles: { font: fontLoaded ? "Roboto" : "helvetica" },
+            margin: { left: 14, right: 14 },
+            didDrawPage: (d) => { currentY = d.cursor.y + 10; } // Atnaujinam poziciją
+        });
+        // Pridedam pavadinimą virš lentelės (rankiniu būdu, nes autoTable to nedaro viduje)
+        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+        doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
+        doc.setFont(undefined, 'normal');
+    };
+
+    // Helper funkcija savaitės dienoms
+    const drawWeekdayTable = (title, dataKey) => {
+        const s = pdfStats[dataKey];
+        const dayRows = s.days.map((d, i) => {
+            const dpct = d.t ? ((d.p/d.t)*100).toFixed(0) : "0";
+            return [txt(LT_DAYS[i]), d.p, d.t, dpct + " %"];
+        });
+
+        doc.autoTable({
+            startY: currentY,
+            head: [[txt('Diena'), txt('Dalyvauta'), txt('Iš viso'), txt('Procentas')]],
+            body: dayRows,
+            theme: 'grid',
+            headStyles: { fillColor: [255, 200, 100], textColor: [0,0,0], halign: 'left' }, // Orange
+            bodyStyles: { font: fontLoaded ? "Roboto" : "helvetica" },
+            margin: { left: 14, right: 14 },
+            didDrawPage: (d) => { currentY = d.cursor.y + 10; }
+        });
+        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+        doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
+        doc.setFont(undefined, 'normal');
+    };
+
+    // Generuojame 4 lenteles
+    drawSummaryTable(txt("Treniruotės"), 'treniruote');
+    drawSummaryTable(txt("Rungtynės"), 'rungtynes');
+    drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Treniruotės"), 'treniruote');
+    drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Rungtynės"), 'rungtynes');
+
+    // 5. DETALI LENTELĖ
+    doc.setFontSize(14);
+    doc.text(txt("Išsami istorija"), pageWidth/2, currentY - 3, { align: 'center' });
 
     if (rows.length === 0) {
-        doc.text("Įrašų nerasta.", pageWidth/2, startY + 10, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(txt("Įrašų nerasta."), pageWidth/2, currentY + 5, { align: 'center' });
     } else {
         doc.autoTable({
-            head: [['Data', fontLoaded?'Diena':'Diena', 'Tipas', 'Buvo']],
+            startY: currentY,
+            head: [[txt('Data'), txt('Diena'), txt('Tipas'), txt('Buvo')]],
             body: rows,
-            startY: startY,
-            theme: 'grid',
-            styles: { 
-                font: fontLoaded ? "Roboto" : "helvetica", 
-                halign: 'center' 
-            },
-            headStyles: { fillColor: [44, 62, 80], halign: 'center' },
+            theme: 'striped',
+            styles: { font: fontLoaded ? "Roboto" : "helvetica", halign: 'center' },
+            headStyles: { fillColor: [44, 62, 80], textColor: [255,255,255] },
             didParseCell: function(data) {
                 if (data.section === 'body' && data.column.index === 3) {
-                    if (data.cell.raw === 'Ne' || data.cell.raw === 'ne') {
+                    if (data.cell.raw === 'Ne' || data.cell.raw === 'ne' || data.cell.raw === txt('Ne')) {
                         data.cell.styles.textColor = [200, 0, 0];
                         data.cell.styles.fontStyle = 'bold';
                     } else {
