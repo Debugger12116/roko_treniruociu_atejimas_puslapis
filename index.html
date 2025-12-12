@@ -43,9 +43,9 @@
         </section>
 
         <section id="admin-panel" class="hidden">
-            <h2>Pridėti įrašą</h2>
+            <h2 id="form-title">Pridėti įrašą</h2>
             <form id="add-form">
-                <input type="date" id="date-input" required>
+                <input type="hidden" id="original-date"> <input type="date" id="date-input" required>
                 <select id="type-input">
                     <option value="treniruote">Treniruotė</option>
                     <option value="rungtynes">Rungtynės</option>
@@ -54,16 +54,17 @@
                     <option value="true">Buvo</option>
                     <option value="false">Nebuvo</option>
                 </select>
-                <button type="submit">Išsaugoti</button>
+                <button type="submit" id="submit-btn">Išsaugoti</button>
+                <button type="button" id="cancel-btn" class="hidden" onclick="resetForm()">Atšaukti</button>
             </form>
             <p class="warning">Dėmesio: GitHub Pages yra statinis. Nauji duomenys saugomi naršyklėje. Norėdami atnaujinti visiems, atsisiųskite JSON ir įkelkite į GitHub.</p>
-            <button onclick="downloadJSON()">Atsisiųsti atnaujintą data.json</button>
+            <button onclick="downloadJSON()" class="download-json-btn">Atsisiųsti atnaujintą data.json</button>
         </section>
 
         <section class="data-view">
             <div class="header-row">
                 <h2>Istorija</h2>
-                <button onclick="generatePDF()" class="pdf-btn">Atsisiųsti PDF Ataskaitą</button>
+                <button onclick="showPDFModal()" class="pdf-btn">Atsisiųsti PDF Ataskaitą</button>
             </div>
             <table id="attendance-table">
                 <thead>
@@ -72,6 +73,7 @@
                         <th>Savaitės diena</th>
                         <th>Tipas</th>
                         <th>Statusas</th>
+                        <th class="admin-col hidden">Veiksmai</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -82,12 +84,53 @@
 
     <div id="login-modal" class="modal hidden">
         <div class="modal-content">
-            <span class="close" onclick="closeLoginModal()">&times;</span>
+            <span class="close" onclick="closeModal('login-modal')">&times;</span>
             <h2>Administratoriaus prisijungimas</h2>
             <input type="text" id="username" placeholder="Vartotojas">
             <input type="password" id="password" placeholder="Slaptažodis">
             <button onclick="attemptLogin()">Prisijungti</button>
             <p id="login-error" class="error"></p>
+        </div>
+    </div>
+
+    <div id="pdf-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('pdf-modal')">&times;</span>
+            <h2>Pasirinkite ataskaitos tipą</h2>
+            
+            <div class="form-group">
+                <label>Tipas:</label>
+                <select id="pdf-type" onchange="togglePdfInputs()">
+                    <option value="month">Mėnesio ataskaita</option>
+                    <option value="year">Metų ataskaita</option>
+                    <option value="all">Viso laiko ataskaita</option>
+                </select>
+            </div>
+
+            <div id="pdf-year-group" class="form-group">
+                <label>Metai:</label>
+                <input type="number" id="pdf-year" value="2025">
+            </div>
+
+            <div id="pdf-month-group" class="form-group">
+                <label>Mėnuo:</label>
+                <select id="pdf-month">
+                    <option value="1">Sausis</option>
+                    <option value="2">Vasaris</option>
+                    <option value="3">Kovas</option>
+                    <option value="4">Balandis</option>
+                    <option value="5">Gegužė</option>
+                    <option value="6">Birželis</option>
+                    <option value="7">Liepa</option>
+                    <option value="8">Rugpjūtis</option>
+                    <option value="9">Rugsėjis</option>
+                    <option value="10">Spalis</option>
+                    <option value="11">Lapkritis</option>
+                    <option value="12">Gruodis</option>
+                </select>
+            </div>
+
+            <button onclick="generatePDF()" class="pdf-btn-generate">Generuoti PDF</button>
         </div>
     </div>
 
