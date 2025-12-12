@@ -44,23 +44,22 @@ window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
 
-// --- INIT (ČIA ATLIKTAS PAKEITIMAS) ---
+// --- INIT (SVARBŪS PAKEITIMAI ČIA) ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Nustatome datą į praėjusį mėnesį
-    const targetDate = new Date();
-    targetDate.setMonth(targetDate.getMonth() - 1); // Atimame 1 mėnesį (automatiškai tvarko metus)
+    // 1. Nustatome datą į DABARTINĮ mėnesį
+    const today = new Date(); 
 
-    // 2. Priverstinai nustatome filtrą į "month" (Mėnesinė)
+    // 2. Priverstinai nustatome filtrą į "month" (Mėnesinė), kad vartotojui nereikėtų rinktis
     const filterTypeElement = document.getElementById('filter-type');
     if (filterTypeElement) {
-        filterTypeElement.value = 'month';
+        filterTypeElement.value = 'month'; // Nustato "Mėnesinė"
     }
 
-    // 3. Užpildome laukus su apskaičiuota data
-    setupDateInputs('filter-year', 'filter-month', targetDate);
-    setupDateInputs('pdf-year', 'pdf-month', targetDate);
+    // 3. Užpildome laukus dabartine data
+    setupDateInputs('filter-year', 'filter-month', today);
+    setupDateInputs('pdf-year', 'pdf-month', today);
     
-    // 4. Pritaikome UI (kad atsirastų mėnesio pasirinkimas)
+    // 4. Iškviečiame filtrų perjungimą, kad atsirastų mėnesio pasirinkimas
     toggleMainFilters();
 
     // Klausomės, ar vartotojas prisijungęs
@@ -81,15 +80,21 @@ function setupDateInputs(yearId, monthId, dateObj) {
     const yInp = document.getElementById(yearId);
     const mInp = document.getElementById(monthId);
     if(yInp) yInp.value = dateObj.getFullYear();
-    if(mInp) mInp.value = dateObj.getMonth() + 1; // +1 nes getMonth() grąžina 0-11
+    if(mInp) mInp.value = dateObj.getMonth() + 1; // +1 nes sausis=0
 }
 
 function toggleMainFilters() {
-    const type = document.getElementById('filter-type').value;
+    const typeElem = document.getElementById('filter-type');
+    // Apsauga, jei elementas dar neužsikrovė
+    if (!typeElem) return; 
+
+    const type = typeElem.value;
     const yGroup = document.getElementById('filter-year-group');
     const mGroup = document.getElementById('filter-month-group');
+    
     if (yGroup) yGroup.classList.add('hidden');
     if (mGroup) mGroup.classList.add('hidden');
+    
     if (type === 'year') {
         if (yGroup) yGroup.classList.remove('hidden');
     } else if (type === 'month') {
