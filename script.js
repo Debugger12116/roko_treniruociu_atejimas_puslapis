@@ -44,22 +44,35 @@ window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
 
-// --- INIT (SVARBŪS PAKEITIMAI ČIA) ---
+// --- INIT (LOGIKA PAKEISTA ČIA) ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Nustatome datą į DABARTINĮ mėnesį
-    const today = new Date(); 
+    
+    // 1. Pirmiausia privalome gauti duomenis, kad žinotume, kada buvo paskutinis įrašas
+    await loadData();
 
-    // 2. Priverstinai nustatome filtrą į "month" (Mėnesinė), kad vartotojui nereikėtų rinktis
-    const filterTypeElement = document.getElementById('filter-type');
-    if (filterTypeElement) {
-        filterTypeElement.value = 'month'; // Nustato "Mėnesinė"
+    // 2. Randame vėliausią datą iš visų turimų įrašų
+    let targetDate = new Date(); // Default: šiandien (jei duomenų visai nėra)
+    
+    // Paimame visus raktus (datas "YYYY-MM-DD") ir surikiuojame
+    const existingDates = Object.keys(attendanceData).sort(); 
+
+    if (existingDates.length > 0) {
+        // Paimame patį paskutinį masyvo elementą (tai bus vėliausia data)
+        const lastRecordDateString = existingDates[existingDates.length - 1];
+        targetDate = new Date(lastRecordDateString);
     }
 
-    // 3. Užpildome laukus dabartine data
-    setupDateInputs('filter-year', 'filter-month', today);
-    setupDateInputs('pdf-year', 'pdf-month', today);
+    // 3. Priverstinai nustatome filtrą į "month" (Mėnesinė)
+    const filterTypeElement = document.getElementById('filter-type');
+    if (filterTypeElement) {
+        filterTypeElement.value = 'month';
+    }
+
+    // 4. Užpildome laukus pagal surastą paskutinę datą
+    setupDateInputs('filter-year', 'filter-month', targetDate);
+    setupDateInputs('pdf-year', 'pdf-month', targetDate);
     
-    // 4. Iškviečiame filtrų perjungimą, kad atsirastų mėnesio pasirinkimas
+    // 5. UI atnaujinimas
     toggleMainFilters();
 
     // Klausomės, ar vartotojas prisijungęs
@@ -69,7 +82,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI();
     });
 
-    await loadData();
     updateUI();
     setupForm();
 });
@@ -85,7 +97,6 @@ function setupDateInputs(yearId, monthId, dateObj) {
 
 function toggleMainFilters() {
     const typeElem = document.getElementById('filter-type');
-    // Apsauga, jei elementas dar neužsikrovė
     if (!typeElem) return; 
 
     const type = typeElem.value;
