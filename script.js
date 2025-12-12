@@ -243,7 +243,7 @@ async function loadFont(url) {
     });
 }
 
-// PAGRINDINĖ FUNKCIJA PDF GENERAVIMUI
+// PAGRINDINĖ FUNKCIJA PDF GENERAVIMUI (PATAISYTA)
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
@@ -321,7 +321,7 @@ async function generatePDF() {
         doc.setTextColor(0,0,0); currentY += 10;
     } else { currentY += 5; }
 
-    // 4. LENTELĖS
+    // 4. LENTELĖS (PATAISYTA LOGIKA)
     
     // Suvestinė
     const drawSummaryTable = (title, dataKey) => {
@@ -329,6 +329,11 @@ async function generatePDF() {
         const missed = s.total - s.present;
         const pct = s.total ? ((s.present/s.total)*100).toFixed(1) : "0.0";
         
+        // Pirmiausia parašome pavadinimą
+        doc.setFontSize(12);
+        doc.text(title, 14, currentY); 
+        currentY += 4; // Tarpas po pavadinimo
+
         doc.autoTable({
             startY: currentY,
             head: [[txt('Rodiklis'), txt('Duomenys')]],
@@ -344,12 +349,6 @@ async function generatePDF() {
             margin: { left: 14, right: 14 },
             didDrawPage: (d) => { currentY = d.cursor.y + 10; }
         });
-        
-        // PATAISYMAS: Nebenaudojame 'bold' stiliaus, nes fontas jo neturi
-        doc.setFontSize(12);
-        // doc.setFont(undefined, 'bold'); // Šita eilutė kėlė klaidą
-        doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
-        // doc.setFont(undefined, 'normal');
     };
 
     // Dienų statistika
@@ -359,6 +358,10 @@ async function generatePDF() {
             const dpct = d.t ? ((d.p/d.t)*100).toFixed(0) : "0";
             return [txt(LT_DAYS[i]), d.p, d.t, dpct + " %"];
         });
+
+        doc.setFontSize(12);
+        doc.text(title, 14, currentY);
+        currentY += 4;
 
         doc.autoTable({
             startY: currentY,
@@ -370,12 +373,6 @@ async function generatePDF() {
             margin: { left: 14, right: 14 },
             didDrawPage: (d) => { currentY = d.cursor.y + 10; }
         });
-
-        // PATAISYMAS: Nebenaudojame 'bold' stiliaus
-        doc.setFontSize(12);
-        // doc.setFont(undefined, 'bold'); // Šita eilutė kėlė klaidą
-        doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
-        // doc.setFont(undefined, 'normal');
     };
 
     drawSummaryTable(txt("Treniruotės"), 'treniruote');
@@ -385,11 +382,12 @@ async function generatePDF() {
 
     // 5. DETALI LENTELĖ
     doc.setFontSize(14);
-    doc.text(txt("Išsami istorija"), pageWidth/2, currentY - 3, { align: 'center' });
+    doc.text(txt("Išsami istorija"), pageWidth/2, currentY, { align: 'center' }); // Pataisyta Y
+    currentY += 6;
 
     if (rows.length === 0) {
         doc.setFontSize(10);
-        doc.text(txt("Įrašų nerasta."), pageWidth/2, currentY + 5, { align: 'center' });
+        doc.text(txt("Įrašų nerasta."), pageWidth/2, currentY, { align: 'center' });
     } else {
         doc.autoTable({
             startY: currentY,
