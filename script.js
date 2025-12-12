@@ -1,11 +1,9 @@
 // --- 1. IMPORTUOJAME FIREBASE BIBLIOTEKAS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-// Pridedame Autentifikacijos biblioteką
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- 2. FIREBASE KONFIGŪRACIJA ---
-// Įklijuokite savo konfigūraciją čia
 const firebaseConfig = {
   apiKey: "AIzaSyBbIEIp6WEdItFvRccLQU-1lSMlxc76Ef8",
   authDomain: "roko-sipkausko-tren-lankymas.firebaseapp.com",
@@ -14,22 +12,22 @@ const firebaseConfig = {
   messagingSenderId: "631642381240",
   appId: "1:631642381240:web:c22aab27fe2c1681ba8d4d",
   measurementId: "G-6BQFEEP9X8"
-};;
+};
 
 // --- 3. INICIJUOJAME SISTEMAS ---
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // Inicijuojame Auth
+const auth = getAuth(app);
 const DB_COLLECTION = "lankomumas";
 
-// --- 4. KONFIGŪRACIJA (Slaptažodžių čia nebėra!) ---
+// --- 4. KONFIGŪRACIJA ---
 const LT_DAYS = ["Pirmadienis", "Antradienis", "Trečiadienis", "Ketvirtadienis", "Penktadienis", "Šeštadienis", "Sekmadienis"];
 const LT_MONTHS = ["Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis", "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"];
 const FONT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
 
 let attendanceData = {};
 let charts = {};
-let currentUser = null; // Saugosime prisijungusį vartotoją
+let currentUser = null;
 
 // --- 5. GLOBALIOS FUNKCIJOS ---
 window.toggleMainFilters = toggleMainFilters;
@@ -46,18 +44,30 @@ window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
 
-// --- INIT ---
+// --- INIT (ČIA ATLIKTAS PAKEITIMAS) ---
 document.addEventListener('DOMContentLoaded', async () => {
-    const today = new Date();
-    setupDateInputs('filter-year', 'filter-month', today);
-    setupDateInputs('pdf-year', 'pdf-month', today);
+    // 1. Nustatome datą į praėjusį mėnesį
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() - 1); // Atimame 1 mėnesį (automatiškai tvarko metus)
+
+    // 2. Priverstinai nustatome filtrą į "month" (Mėnesinė)
+    const filterTypeElement = document.getElementById('filter-type');
+    if (filterTypeElement) {
+        filterTypeElement.value = 'month';
+    }
+
+    // 3. Užpildome laukus su apskaičiuota data
+    setupDateInputs('filter-year', 'filter-month', targetDate);
+    setupDateInputs('pdf-year', 'pdf-month', targetDate);
+    
+    // 4. Pritaikome UI (kad atsirastų mėnesio pasirinkimas)
     toggleMainFilters();
 
-    // Klausomės, ar vartotojas prisijungęs/atsijungęs
+    // Klausomės, ar vartotojas prisijungęs
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
-        checkSession(); // Atnaujiname mygtukus (Rodyti/Slėpti admin panelę)
-        updateUI(); // Perskaičiuojame lentelę (kad atsirastų/dingtų "Redaguoti" mygtukai)
+        checkSession();
+        updateUI();
     });
 
     await loadData();
@@ -65,12 +75,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
 });
 
-// ... (setupDateInputs ir toggleMainFilters funkcijos lieka tokios pačios) ...
+// ... Toliau visos funkcijos lieka tokios pačios ...
+
 function setupDateInputs(yearId, monthId, dateObj) {
     const yInp = document.getElementById(yearId);
     const mInp = document.getElementById(monthId);
     if(yInp) yInp.value = dateObj.getFullYear();
-    if(mInp) mInp.value = dateObj.getMonth() + 1;
+    if(mInp) mInp.value = dateObj.getMonth() + 1; // +1 nes getMonth() grąžina 0-11
 }
 
 function toggleMainFilters() {
@@ -79,8 +90,12 @@ function toggleMainFilters() {
     const mGroup = document.getElementById('filter-month-group');
     if (yGroup) yGroup.classList.add('hidden');
     if (mGroup) mGroup.classList.add('hidden');
-    if (type === 'year') if (yGroup) yGroup.classList.remove('hidden');
-    else if (type === 'month') { if (yGroup) yGroup.classList.remove('hidden'); if (mGroup) mGroup.classList.remove('hidden'); }
+    if (type === 'year') {
+        if (yGroup) yGroup.classList.remove('hidden');
+    } else if (type === 'month') {
+        if (yGroup) yGroup.classList.remove('hidden'); 
+        if (mGroup) mGroup.classList.remove('hidden'); 
+    }
 }
 
 // --- DUOMENŲ UŽKROVIMAS ---
@@ -97,9 +112,9 @@ async function loadData() {
     }
 }
 
-// --- FIREBASE RAŠYMAS (Saugus) ---
+// --- FIREBASE RAŠYMAS ---
 async function saveDataToFirebase(date, data) {
-    if (!currentUser) return alert("Neturite teisių! Prisijunkite."); // Apsauga kode
+    if (!currentUser) return alert("Neturite teisių! Prisijunkite.");
     try {
         await setDoc(doc(db, DB_COLLECTION, date), data);
         attendanceData[date] = data;
@@ -149,7 +164,7 @@ async function deleteRecord(date) {
 }
 
 function startEdit(date) {
-    if (!currentUser) return; // Neleidžiame net pradėti, jei neprisijungęs
+    if (!currentUser) return;
     const rec = attendanceData[date];
     if (!rec) return;
     document.getElementById('date-input').value = date;
@@ -188,7 +203,6 @@ function setupForm() {
 function updateUI() {
     const dates = Object.keys(attendanceData).sort().reverse();
     const tableBody = document.querySelector('#attendance-table tbody');
-    // Tikriname per currentUser kintamąjį, o ne localStorage
     const isLoggedIn = !!currentUser; 
     
     const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'all';
@@ -225,7 +239,6 @@ function updateUI() {
                 if (rec.present) stats.weekday[dayIdx].present++;
             }
 
-            // Rodyti mygtukus tik jei prisijungęs
             const actionsHtml = isLoggedIn ? `
                 <td>
                     <button onclick="startEdit('${date}')" class="action-btn edit-btn">Redaguoti</button>
@@ -259,7 +272,6 @@ function updateUI() {
     );
 }
 
-// ... (updateStatCard ir renderCharts, showPDFModal, togglePdfInputs, sanitizeText, loadFont, generatePDF lieka tokie patys kaip anksčiau) ...
 function updateStatCard(id, stat) {
     const elRate = document.getElementById(`${id}-stat`);
     const elDetail = document.getElementById(`${id}-detail`);
@@ -269,6 +281,7 @@ function updateStatCard(id, stat) {
         elDetail.innerText = `${stat.present} iš ${stat.total}`;
     }
 }
+
 function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     const ctx2 = document.getElementById('weekdayChart');
@@ -289,7 +302,9 @@ function renderCharts(stats) {
         });
     }
 }
+
 function showPDFModal() { document.getElementById('pdf-modal').classList.remove('hidden'); }
+
 function togglePdfInputs() {
     const type = document.getElementById('pdf-type').value;
     const yGroup = document.getElementById('pdf-year-group');
@@ -299,16 +314,19 @@ function togglePdfInputs() {
     if (type === 'all') { yGroup.classList.add('hidden'); mGroup.classList.add('hidden'); }
     else if (type === 'year') { mGroup.classList.add('hidden'); }
 }
+
 function sanitizeText(str) {
     const map = { 'ą':'a', 'č':'c', 'ę':'e', 'ė':'e', 'į':'i', 'š':'s', 'ų':'u', 'ū':'u', 'ž':'z', 'Ą':'A', 'Č':'C', 'Ę':'E', 'Ė':'E', 'Į':'I', 'Š':'S', 'Ų':'U', 'Ū':'U', 'Ž':'Z' };
     return str.replace(/[ąčęėįšųūžĄČĘĖĮŠŲŪŽ]/g, match => map[match]);
 }
+
 async function loadFont(url) {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("Šriftas nepasiekiamas");
     const blob = await resp.blob();
     return new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(blob); });
 }
+
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
@@ -358,19 +376,16 @@ async function generatePDF() {
     doc.save(`lankomumas_${type}.pdf`); closeModal('pdf-modal');
 }
 
-// --- 6. AUTENTIFIKACIJA (Nauja) ---
+// --- 6. AUTENTIFIKACIJA ---
 function showLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-// Dabar jungiamės tiesiai prie Firebase
 async function attemptLogin() {
-    const email = document.getElementById('username').value; // Įvesties laukas dabar turi būti el. paštas!
+    const email = document.getElementById('username').value;
     const pass = document.getElementById('password').value;
-    
     try {
         await signInWithEmailAndPassword(auth, email, pass);
         closeModal('login-modal');
-        // Viskas kitas įvyks automatiškai per onAuthStateChanged
     } catch (error) {
         console.error(error);
         document.getElementById('login-error').innerText = "Klaida: " + error.message;
@@ -380,7 +395,6 @@ async function attemptLogin() {
 async function logout() {
     try {
         await signOut(auth);
-        // Viskas kitas įvyks automatiškai per onAuthStateChanged
     } catch (error) {
         console.error(error);
     }
