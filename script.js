@@ -4,7 +4,7 @@ const ADMIN_PASS = "rokas123";
 const LT_DAYS = ["Pirmadienis", "Antradienis", "Trečiadienis", "Ketvirtadienis", "Penktadienis", "Šeštadienis", "Sekmadienis"];
 const LT_MONTHS = ["Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis", "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"];
 
-// Nuoroda į šriftą
+// Nuoroda į šriftą (Tik Regular versija)
 const FONT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
 
 let attendanceData = {};
@@ -265,10 +265,9 @@ async function generatePDF() {
     const year = parseInt(document.getElementById('pdf-year').value);
     const month = parseInt(document.getElementById('pdf-month').value);
     
-    // Pagalbinė funkcija tekstui
     const txt = (t) => fontLoaded ? t : sanitizeText(t);
 
-    // 2. Statistikos paruošimas PDF laikotarpiui
+    // 2. Statistikos paruošimas
     let pdfStats = {
         treniruote: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) },
         rungtynes: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) }
@@ -287,7 +286,6 @@ async function generatePDF() {
             const dayIdx = (d.getDay() + 6) % 7;
             const tType = rec.type === 'treniruote' ? 'treniruote' : 'rungtynes';
 
-            // Skaičiuojame statistiką
             pdfStats[tType].total++;
             pdfStats[tType].days[dayIdx].t++;
             if(rec.present) {
@@ -295,7 +293,6 @@ async function generatePDF() {
                 pdfStats[tType].days[dayIdx].p++;
             }
 
-            // Ruošiame eilutę detaliai lentelei
             rows.push([
                 date, 
                 txt(LT_DAYS[dayIdx]), 
@@ -324,9 +321,9 @@ async function generatePDF() {
         doc.setTextColor(0,0,0); currentY += 10;
     } else { currentY += 5; }
 
-    // 4. STATISTIKOS LENTELĖS (Kaip nuotraukoje)
+    // 4. LENTELĖS
     
-    // Helper funkcija suvestinėms
+    // Suvestinė
     const drawSummaryTable = (title, dataKey) => {
         const s = pdfStats[dataKey];
         const missed = s.total - s.present;
@@ -342,18 +339,20 @@ async function generatePDF() {
                 [txt('Lankomumo procentas'), pct + " %"]
             ],
             theme: 'grid',
-            headStyles: { fillColor: [100, 255, 255], textColor: [0,0,0], halign: 'left' }, // Cyan
+            headStyles: { fillColor: [100, 255, 255], textColor: [0,0,0], halign: 'left' },
             bodyStyles: { font: fontLoaded ? "Roboto" : "helvetica" },
             margin: { left: 14, right: 14 },
-            didDrawPage: (d) => { currentY = d.cursor.y + 10; } // Atnaujinam poziciją
+            didDrawPage: (d) => { currentY = d.cursor.y + 10; }
         });
-        // Pridedam pavadinimą virš lentelės (rankiniu būdu, nes autoTable to nedaro viduje)
-        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+        
+        // PATAISYMAS: Nebenaudojame 'bold' stiliaus, nes fontas jo neturi
+        doc.setFontSize(12);
+        // doc.setFont(undefined, 'bold'); // Šita eilutė kėlė klaidą
         doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
-        doc.setFont(undefined, 'normal');
+        // doc.setFont(undefined, 'normal');
     };
 
-    // Helper funkcija savaitės dienoms
+    // Dienų statistika
     const drawWeekdayTable = (title, dataKey) => {
         const s = pdfStats[dataKey];
         const dayRows = s.days.map((d, i) => {
@@ -366,17 +365,19 @@ async function generatePDF() {
             head: [[txt('Diena'), txt('Dalyvauta'), txt('Iš viso'), txt('Procentas')]],
             body: dayRows,
             theme: 'grid',
-            headStyles: { fillColor: [255, 200, 100], textColor: [0,0,0], halign: 'left' }, // Orange
+            headStyles: { fillColor: [255, 200, 100], textColor: [0,0,0], halign: 'left' },
             bodyStyles: { font: fontLoaded ? "Roboto" : "helvetica" },
             margin: { left: 14, right: 14 },
             didDrawPage: (d) => { currentY = d.cursor.y + 10; }
         });
-        doc.setFontSize(12); doc.setFont(undefined, 'bold');
+
+        // PATAISYMAS: Nebenaudojame 'bold' stiliaus
+        doc.setFontSize(12);
+        // doc.setFont(undefined, 'bold'); // Šita eilutė kėlė klaidą
         doc.text(title, 14, doc.lastAutoTable.finalY - doc.lastAutoTable.height - 2);
-        doc.setFont(undefined, 'normal');
+        // doc.setFont(undefined, 'normal');
     };
 
-    // Generuojame 4 lenteles
     drawSummaryTable(txt("Treniruotės"), 'treniruote');
     drawSummaryTable(txt("Rungtynės"), 'rungtynes');
     drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Treniruotės"), 'treniruote');
