@@ -1,0 +1,6 @@
+{
+  "2025-10-06": { "type": "treniruote", "present": true },
+  "2025-10-08": { "type": "treniruote", "present": true },
+  "2025-10-10": { "type": "rungtynes", "present": false },
+  "2025-10-13": { "type": "treniruote", "present": true }
+}
