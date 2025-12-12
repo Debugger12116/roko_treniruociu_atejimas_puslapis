@@ -31,21 +31,13 @@ async function loadData() {
     const localData = localStorage.getItem('attendanceData');
     try {
         const response = await fetch('data.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const jsonData = await response.json();
-        // Sujungiame duomenis (LocalStorage turi pirmenybę naujiems įrašams, jei jie sutampa)
         attendanceData = { ...jsonData, ...(localData ? JSON.parse(localData) : {}) };
     } catch (e) {
-        console.error("Nepavyko užkrauti data.json arba failas tuščias", e);
-        // Jei nėra failo, naudojame tik LocalStorage
-        if (localData) {
-            attendanceData = JSON.parse(localData);
-        } else {
-            // Jei nėra nei failo, nei localStorage, naudojame tuščią objektą
-            attendanceData = {}; 
-        }
+        console.error("Klaida kraunant data.json", e);
+        if (localData) attendanceData = JSON.parse(localData);
+        else attendanceData = {}; 
     }
 }
 
@@ -65,21 +57,16 @@ function downloadJSON() {
 }
 
 // --- CRUD OPERACIJOS ---
-
-// 1. Išsaugoti (Sukurti arba Atnaujinti)
 function handleSave(date, type, status, originalDate) {
-    // Jei redaguojame ir pakeitėme datą, ištriname seną įrašą
     if (originalDate && originalDate !== date) {
         delete attendanceData[originalDate];
     }
-    
     attendanceData[date] = { type, present: status };
     saveToStorage();
     resetForm();
-    alert('Įrašas išsaugotas! (Nepamirškite atsisiųsti JSON, jei norite atnaujinti visiems)');
+    alert('Įrašas išsaugotas! (Nepamirškite atsisiųsti JSON)');
 }
 
-// 2. Ištrinti
 function deleteRecord(date) {
     if (confirm(`Ar tikrai norite ištrinti ${date} įrašą?`)) {
         delete attendanceData[date];
@@ -87,7 +74,6 @@ function deleteRecord(date) {
     }
 }
 
-// 3. Redaguoti (Užpildyti formą)
 function startEdit(date) {
     const rec = attendanceData[date];
     if (!rec) return;
@@ -97,12 +83,10 @@ function startEdit(date) {
     document.getElementById('type-input').value = rec.type;
     document.getElementById('status-input').value = rec.present;
     
-    // UI Pakeitimai
     document.getElementById('form-title').innerText = "Redaguoti įrašą";
     document.getElementById('submit-btn').innerText = "Atnaujinti";
     document.getElementById('cancel-btn').classList.remove('hidden');
     
-    // Scroll į viršų
     const adminPanel = document.getElementById('admin-panel');
     if(adminPanel) adminPanel.scrollIntoView({ behavior: 'smooth' });
 }
@@ -118,14 +102,12 @@ function resetForm() {
 function setupForm() {
     const form = document.getElementById('add-form');
     if (!form) return;
-
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         const date = document.getElementById('date-input').value;
         const originalDate = document.getElementById('original-date').value;
         const type = document.getElementById('type-input').value;
         const status = document.getElementById('status-input').value === 'true';
-        
         if(date) handleSave(date, type, status, originalDate);
     });
 }
@@ -147,23 +129,17 @@ function updateUI() {
     dates.forEach(date => {
         const rec = attendanceData[date];
         const dateObj = new Date(date);
-        // getDay(): 0 = Sekmadienis, 1 = Pirmadienis...
-        // Mums reikia: 0 = Pirmadienis, ..., 6 = Sekmadienis
         const dayIdx = (dateObj.getDay() + 6) % 7; 
 
-        // Statistika
         if (stats[rec.type]) {
             stats[rec.type].total++;
             if (rec.present) stats[rec.type].present++;
         }
-        
-        // Savaitės dienos statistika
         if (stats.weekday[dayIdx]) {
             stats.weekday[dayIdx].total++;
             if (rec.present) stats.weekday[dayIdx].present++;
         }
 
-        // Lentelė
         const actionsHtml = isLoggedIn ? `
             <td>
                 <button onclick="startEdit('${date}')" class="action-btn edit-btn">Redaguoti</button>
@@ -189,7 +165,6 @@ function updateUI() {
     updateStatCard('match', stats.rungtynes);
     renderCharts(stats);
     
-    // Rodyti/Slėpti Admin stulpelį
     const adminCols = document.querySelectorAll('.admin-col');
     adminCols.forEach(col => isLoggedIn ? col.classList.remove('hidden') : col.classList.add('hidden'));
 }
@@ -197,7 +172,6 @@ function updateUI() {
 function updateStatCard(idPrefix, stat) {
     const elRate = document.getElementById(`${idPrefix}-stat`);
     const elDetail = document.getElementById(`${idPrefix}-detail`);
-    
     if (elRate && elDetail) {
         const rate = stat.total ? ((stat.present / stat.total) * 100).toFixed(1) : 0;
         elRate.innerText = `${rate}%`;
@@ -205,7 +179,6 @@ function updateStatCard(idPrefix, stat) {
     }
 }
 
-// --- DIAGRAMOS ---
 function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     if (ctx1) {
@@ -241,7 +214,7 @@ function renderCharts(stats) {
     }
 }
 
-// --- PDF GENERAVIMAS ---
+// --- PDF GENERAVIMAS SU LIETUVIŠKU ŠRIFTU ---
 function showPDFModal() { 
     const modal = document.getElementById('pdf-modal');
     if(modal) modal.classList.remove('hidden'); 
@@ -264,13 +237,39 @@ function togglePdfInputs() {
     }
 }
 
-function generatePDF() {
+// Pagalbinė funkcija šrifto failo nuskaitymui
+async function loadFont(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Nepavyko rasti šrifto failo!");
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]); // Grąžina tik Base64
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function generatePDF() {
     if (!window.jspdf) {
-        alert("Nepavyko užkrauti PDF bibliotekos. Patikrinkite interneto ryšį.");
+        alert("Nepavyko užkrauti PDF bibliotekos.");
         return;
     }
+    
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+
+    // 1. Įkeliame lietuvišką šriftą
+    try {
+        // Įsitikinkite, kad failas 'Roboto-Regular.ttf' yra tame pačiame aplanke!
+        const fontBase64 = await loadFont('Roboto-Regular.ttf');
+        doc.addFileToVFS("Roboto-Regular.ttf", fontBase64);
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+        doc.setFont("Roboto"); // Nustatome kaip aktyvų šriftą
+    } catch (e) {
+        console.warn("Šriftas nerastas, naudojamas standartinis (lietuviškos raidės gali neveikti).", e);
+        alert("Dėmesio: 'Roboto-Regular.ttf' nerastas. Įkelkite failą į aplanką, kad veiktų lietuviškos raidės.");
+    }
     
     const type = document.getElementById('pdf-type').value;
     const year = parseInt(document.getElementById('pdf-year').value);
@@ -280,11 +279,9 @@ function generatePDF() {
     let subtitle = "";
     let showNote = false;
 
-    // Filtravimo logika
     const filteredData = [];
     const dates = Object.keys(attendanceData).sort();
 
-    // Patikrinimas dėl pastabos rodymo
     if (type === 'all') {
         showNote = true;
         subtitle = "Viso laiko statistika";
@@ -312,38 +309,47 @@ function generatePDF() {
         }
     });
 
-    // PDF Turinys
+    // Centruojame antraštes
+    const pageWidth = doc.internal.pageSize.getWidth();
     doc.setFontSize(18);
-    doc.text(titleText, 105, 15, null, null, "center");
+    doc.text(titleText, pageWidth / 2, 15, { align: 'center' });
     
     doc.setFontSize(14);
-    doc.text(subtitle, 105, 22, null, null, "center");
+    doc.text(subtitle, pageWidth / 2, 22, { align: 'center' });
     
     doc.setFontSize(11);
-    doc.text("Rokas Šipkauskas", 105, 29, null, null, "center");
+    doc.text("Rokas Šipkauskas", pageWidth / 2, 29, { align: 'center' });
 
     let startY = 35;
 
-    // Pridėti specialią pastabą
     if (showNote) {
         doc.setFontSize(10);
-        doc.setTextColor(200, 0, 0); // Raudona
-        doc.text("* Duomenys pradėti skaičiuoti nuo 2025-10-06", 105, startY, null, null, "center");
-        doc.setTextColor(0, 0, 0); // Juoda
+        doc.setTextColor(200, 0, 0);
+        doc.text("* Duomenys pradėti skaičiuoti nuo 2025-10-06", pageWidth / 2, startY, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
         startY += 10;
     } else {
         startY += 5;
     }
 
     if (filteredData.length === 0) {
-        doc.text("Pasirinktu laikotarpiu įrašų nerasta.", 105, startY + 10, null, null, "center");
+        doc.text("Pasirinktu laikotarpiu įrašų nerasta.", pageWidth / 2, startY + 10, { align: 'center' });
     } else {
         doc.autoTable({
             head: [['Data', 'Diena', 'Tipas', 'Buvo']],
             body: filteredData,
             startY: startY,
             theme: 'grid',
-            headStyles: { fillColor: [44, 62, 80] },
+            // Nustatome lietuvišką šriftą lentelei ir centravimą
+            styles: { 
+                font: "Roboto", 
+                fontStyle: 'normal',
+                halign: 'center' // Centruojame tekstą visuose stulpeliuose
+            }, 
+            headStyles: { 
+                fillColor: [44, 62, 80],
+                halign: 'center' // Centruojame antraštes
+            },
             didParseCell: function(data) {
                 if (data.section === 'body' && data.column.index === 3) {
                     if (data.cell.raw === 'Ne') {
