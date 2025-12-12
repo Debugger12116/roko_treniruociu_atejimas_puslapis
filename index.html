@@ -3,137 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lankomumo Statistika - Rokas Šipkauskas</title>
+    <title>Lankomumo Sistema</title>
+    
     <link rel="stylesheet" href="style.css">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
+<div class="container">
     <header>
-        <h1>Lankomumo Sekimas</h1>
-        <div id="auth-section">
-            <button id="login-btn" onclick="showLoginModal()">Prisijungti (Admin)</button>
-            <button id="logout-btn" class="hidden" onclick="logout()">Atsijungti</button>
+        <h1>Lankomumo Sistema</h1>
+        <div>
+            <button id="login-btn" onclick="showLoginModal()" class="auth-btn btn-login">Prisijungti</button>
+            <button id="logout-btn" onclick="logout()" class="auth-btn btn-logout hidden">Atsijungti</button>
         </div>
     </header>
 
-    <div class="container">
-        <section class="stats-grid">
-            <div class="card">
-                <h3>Treniruočių lankomumas</h3>
-                <p id="train-stat">0%</p>
-                <small id="train-detail">0/0</small>
-            </div>
-            <div class="card">
-                <h3>Rungtynių lankomumas</h3>
-                <p id="match-stat">0%</p>
-                <small id="match-detail">0/0</small>
-            </div>
-        </section>
+    <div class="filter-section">
+        <strong>Rodyti statistiką:</strong>
+        
+        <select id="filter-type" onchange="toggleMainFilters()">
+            <option value="all">Visas laikas</option>
+            <option value="year">Metinė</option>
+            <option value="month" selected>Mėnesinė</option>
+        </select>
 
-        <section class="charts-section">
-            <div class="chart-container">
-                <canvas id="attendanceChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="weekdayChart"></canvas>
-            </div>
-        </section>
+        <div id="filter-year-group" class="hidden">
+            <input type="number" id="filter-year" placeholder="Metai">
+        </div>
 
-        <section id="admin-panel" class="hidden">
-            <h2 id="form-title">Pridėti įrašą</h2>
-            <form id="add-form">
-                <input type="hidden" id="original-date"> <input type="date" id="date-input" required>
-                <select id="type-input">
+        <div id="filter-month-group">
+            <select id="filter-month">
+                <option value="1">Sausis</option>
+                <option value="2">Vasaris</option>
+                <option value="3">Kovas</option>
+                <option value="4">Balandis</option>
+                <option value="5">Gegužė</option>
+                <option value="6">Birželis</option>
+                <option value="7">Liepa</option>
+                <option value="8">Rugpjūtis</option>
+                <option value="9">Rugsėjis</option>
+                <option value="10">Spalis</option>
+                <option value="11">Lapkritis</option>
+                <option value="12">Gruodis</option>
+            </select>
+        </div>
+
+        <button onclick="updateUI()" class="btn-update">Atnaujinti</button>
+    </div>
+
+    <div class="stats-container">
+        <div class="stat-card">
+            <div class="stat-label">Treniruotės</div>
+            <div id="train-stat" class="stat-number">0%</div>
+            <div id="train-detail" class="stat-detail">0 iš 0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Rungtynės</div>
+            <div id="match-stat" class="stat-number">0%</div>
+            <div id="match-detail" class="stat-detail">0 iš 0</div>
+        </div>
+    </div>
+
+    <div class="charts-wrapper">
+        <div class="chart-box">
+            <canvas id="attendanceChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="weekdayChart"></canvas>
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button onclick="downloadJSON()" class="btn-json">Atsisiųsti JSON (Backup)</button>
+        <button onclick="showPDFModal()" class="btn-pdf">Generuoti PDF Ataskaitą</button>
+    </div>
+
+    <div class="table-container">
+        <table id="attendance-table">
+            <thead>
+                <tr>
+                    <th width="150">Data</th>
+                    <th>Diena</th>
+                    <th>Tipas</th>
+                    <th>Būsena</th>
+                    <th class="admin-col hidden" width="160">Veiksmai</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <div id="admin-panel" class="admin-panel hidden">
+        <h3 id="form-title" style="margin-top:0; color:#16a085;">Pridėti įrašą</h3>
+        <form id="add-form" class="admin-form">
+            <input type="hidden" id="original-date">
+            
+            <div class="form-group">
+                <label>Data</label>
+                <input type="date" id="date-input" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Tipas</label>
+                <select id="type-input" class="form-control">
                     <option value="treniruote">Treniruotė</option>
                     <option value="rungtynes">Rungtynės</option>
                 </select>
-                <select id="status-input">
+            </div>
+
+            <div class="form-group">
+                <label>Būsena</label>
+                <select id="status-input" class="form-control">
                     <option value="true">Buvo</option>
                     <option value="false">Nebuvo</option>
                 </select>
-                <button type="submit" id="submit-btn">Išsaugoti</button>
-                <button type="button" id="cancel-btn" class="hidden" onclick="resetForm()">Atšaukti</button>
-            </form>
-            <p class="warning">Dėmesio: GitHub Pages yra statinis. Nauji duomenys saugomi naršyklėje. Norėdami atnaujinti visiems, atsisiųskite JSON ir įkelkite į GitHub.</p>
-            <button onclick="downloadJSON()" class="download-json-btn">Atsisiųsti atnaujintą data.json</button>
-        </section>
-
-        <section class="data-view">
-            <div class="header-row">
-                <h2>Istorija</h2>
-                <button onclick="showPDFModal()" class="pdf-btn">Atsisiųsti PDF Ataskaitą</button>
             </div>
-            <table id="attendance-table">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Savaitės diena</th>
-                        <th>Tipas</th>
-                        <th>Statusas</th>
-                        <th class="admin-col hidden">Veiksmai</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
-        </section>
+
+            <div class="form-group" style="margin-left: auto;">
+                <label>&nbsp;</label>
+                <div>
+                    <button type="submit" id="submit-btn" class="btn-submit">Išsaugoti</button>
+                    <button type="button" id="cancel-btn" onclick="resetForm()" class="btn-cancel hidden">Atšaukti</button>
+                </div>
+            </div>
+        </form>
     </div>
 
-    <div id="login-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('login-modal')">&times;</span>
-            <h2>Administratoriaus prisijungimas</h2>
-            <input type="text" id="username" placeholder="Vartotojas">
-            <input type="password" id="password" placeholder="Slaptažodis">
-            <button onclick="attemptLogin()">Prisijungti</button>
-            <p id="login-error" class="error"></p>
+</div>
+
+<div id="login-modal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Trenerio prisijungimas</h3>
+        <input type="text" id="username" placeholder="Vartotojo vardas">
+        <input type="password" id="password" placeholder="Slaptažodis">
+        <p id="login-error" style="color:red; font-size: 0.9em;"></p>
+        <div class="modal-actions">
+            <button onclick="closeModal('login-modal')">Atšaukti</button>
+            <button onclick="attemptLogin()" style="background-color: #3498db; color: white; border:none; padding: 8px 15px; border-radius: 4px;">Prisijungti</button>
         </div>
     </div>
+</div>
 
-    <div id="pdf-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('pdf-modal')">&times;</span>
-            <h2>Pasirinkite ataskaitos tipą</h2>
-            
-            <div class="form-group">
-                <label>Tipas:</label>
-                <select id="pdf-type" onchange="togglePdfInputs()">
-                    <option value="month">Mėnesio ataskaita</option>
-                    <option value="year">Metų ataskaita</option>
-                    <option value="all">Viso laiko ataskaita</option>
-                </select>
-            </div>
+<div id="pdf-modal" class="modal hidden">
+    <div class="modal-content">
+        <h3>PDF Ataskaita</h3>
+        <label>Laikotarpis:</label>
+        <select id="pdf-type" onchange="togglePdfInputs()">
+            <option value="month">Mėnesinė</option>
+            <option value="year">Metinė</option>
+            <option value="all">Visas laikas</option>
+        </select>
 
-            <div id="pdf-year-group" class="form-group">
-                <label>Metai:</label>
-                <input type="number" id="pdf-year" value="2025">
-            </div>
+        <div id="pdf-year-group">
+            <label>Metai:</label>
+            <input type="number" id="pdf-year">
+        </div>
 
-            <div id="pdf-month-group" class="form-group">
-                <label>Mėnuo:</label>
-                <select id="pdf-month">
-                    <option value="1">Sausis</option>
-                    <option value="2">Vasaris</option>
-                    <option value="3">Kovas</option>
-                    <option value="4">Balandis</option>
-                    <option value="5">Gegužė</option>
-                    <option value="6">Birželis</option>
-                    <option value="7">Liepa</option>
-                    <option value="8">Rugpjūtis</option>
-                    <option value="9">Rugsėjis</option>
-                    <option value="10">Spalis</option>
-                    <option value="11">Lapkritis</option>
-                    <option value="12">Gruodis</option>
-                </select>
-            </div>
+        <div id="pdf-month-group">
+            <label>Mėnuo:</label>
+            <select id="pdf-month">
+                <option value="1">Sausis</option>
+                <option value="2">Vasaris</option>
+                <option value="3">Kovas</option>
+                <option value="4">Balandis</option>
+                <option value="5">Gegužė</option>
+                <option value="6">Birželis</option>
+                <option value="7">Liepa</option>
+                <option value="8">Rugpjūtis</option>
+                <option value="9">Rugsėjis</option>
+                <option value="10">Spalis</option>
+                <option value="11">Lapkritis</option>
+                <option value="12">Gruodis</option>
+            </select>
+        </div>
 
-            <button onclick="generatePDF()" class="pdf-btn-generate">Generuoti PDF</button>
+        <div class="modal-actions">
+            <button onclick="closeModal('pdf-modal')">Atšaukti</button>
+            <button onclick="generatePDF()" style="background-color: #8e44ad; color: white; border:none; padding: 8px 15px; border-radius: 4px;">Generuoti</button>
         </div>
     </div>
+</div>
 
-    <script src="script.js"></script>
+<script src="script.js"></script>
+
 </body>
 </html>
