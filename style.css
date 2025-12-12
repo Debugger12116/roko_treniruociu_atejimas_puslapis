@@ -305,10 +305,10 @@ td {
   padding: 16px 20px;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  vertical-align: middle; /* SVARBU: Išlygina turinį vertikaliai per vidurį */
+  vertical-align: middle;
 }
 
-/* Specialus stilius paskutiniam stulpeliui (Būsena), kad būtų centruotas */
+/* Centruojame paskutinį stulpelį (Būsena) */
 th:last-child,
 td:last-child {
   text-align: center;
@@ -337,28 +337,17 @@ tbody tr:hover {
   background-color: var(--bg-hover);
 }
 
+/* PAKEISTA: Panaikintas fonas, paliktas tik spalvotas tekstas */
 .status-true {
   color: var(--success);
-  font-weight: 600;
-  background-color: rgba(0, 168, 107, 0.1);
-  padding: 6px 16px;
-  border-radius: 20px;
-  display: inline-block;
-  font-size: 0.85rem;
-  min-width: 80px;
-  text-align: center;
+  font-weight: 700; /* Paryškinta */
+  /* background-color, padding, border-radius - ištrinti */
 }
 
 .status-false {
   color: var(--danger);
-  font-weight: 600;
-  background-color: rgba(220, 53, 69, 0.1);
-  padding: 6px 16px;
-  border-radius: 20px;
-  display: inline-block;
-  font-size: 0.85rem;
-  min-width: 80px;
-  text-align: center;
+  font-weight: 700; /* Paryškinta */
+  /* background-color, padding, border-radius - ištrinti */
 }
 
 .action-btn {
