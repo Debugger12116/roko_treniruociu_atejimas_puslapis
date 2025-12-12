@@ -332,4 +332,30 @@ function attemptLogin() {
         checkSession();
         closeModal('login-modal');
     } else {
-        document.getElementById('login-error
+        document.getElementById('login-error').innerText = "Neteisingi duomenys";
+    }
+}
+
+function logout() {
+    localStorage.removeItem('isLoggedIn');
+    checkSession();
+}
+
+function checkSession() {
+    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const adminPanel = document.getElementById('admin-panel');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    if (loggedIn) {
+        adminPanel.classList.remove('hidden');
+        loginBtn.classList.add('hidden');
+        logoutBtn.classList.remove('hidden');
+        updateUI(); // Perpiešti lentelę su mygtukais
+    } else {
+        adminPanel.classList.add('hidden');
+        loginBtn.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+        updateUI();
+    }
+}
