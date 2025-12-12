@@ -4,7 +4,6 @@ const ADMIN_PASS = "rokas123";
 const LT_DAYS = ["Pirmadienis", "Antradienis", "Trečiadienis", "Ketvirtadienis", "Penktadienis", "Šeštadienis", "Sekmadienis"];
 const LT_MONTHS = ["Sausis", "Vasaris", "Kovas", "Balandis", "Gegužė", "Birželis", "Liepa", "Rugpjūtis", "Rugsėjis", "Spalis", "Lapkritis", "Gruodis"];
 
-// Nuoroda į šriftą (Tik Regular versija)
 const FONT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
 
 let attendanceData = {};
@@ -12,18 +11,45 @@ let charts = {};
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
+    // Nustatome filtrus į šiandieną
+    const today = new Date();
+    setupDateInputs('filter-year', 'filter-month', today);
+    setupDateInputs('pdf-year', 'pdf-month', today);
+    
+    toggleMainFilters(); // Sutvarkom filtrų matomumą pradžioje
+
     await loadData();
-    updateUI();
+    updateUI(); // Čia jau suveiks filtravimas
     setupForm();
     checkSession();
-    
-    // Nustatyti PDF modalą į esamą datą
-    const today = new Date();
-    const yearInput = document.getElementById('pdf-year');
-    if(yearInput) yearInput.value = today.getFullYear();
-    const monthInput = document.getElementById('pdf-month');
-    if(monthInput) monthInput.value = today.getMonth() + 1;
 });
+
+// Pagalbinė funkcija datoms nustatyti
+function setupDateInputs(yearId, monthId, dateObj) {
+    const yInp = document.getElementById(yearId);
+    const mInp = document.getElementById(monthId);
+    if(yInp) yInp.value = dateObj.getFullYear();
+    if(mInp) mInp.value = dateObj.getMonth() + 1;
+}
+
+// --- FILTRŲ LOGIKA (NAUJA) ---
+function toggleMainFilters() {
+    const type = document.getElementById('filter-type').value;
+    const yGroup = document.getElementById('filter-year-group');
+    const mGroup = document.getElementById('filter-month-group');
+    
+    // Visada paslepiame pradžioje, tada rodom pagal tipą
+    if (yGroup) yGroup.classList.add('hidden');
+    if (mGroup) mGroup.classList.add('hidden');
+
+    if (type === 'year') {
+        if (yGroup) yGroup.classList.remove('hidden');
+    } else if (type === 'month') {
+        if (yGroup) yGroup.classList.remove('hidden');
+        if (mGroup) mGroup.classList.remove('hidden');
+    }
+    // Jei 'all', abu lieka paslėpti
+}
 
 // --- DUOMENŲ ĮKĖLIMAS ---
 async function loadData() {
@@ -37,7 +63,7 @@ async function loadData() {
             throw new Error("Failas nerastas");
         }
     } catch (e) {
-        console.log("Naudojamas tik vietinis įrašymas (data.json nerastas arba tuščias)");
+        console.log("Naudojamas tik vietinis įrašymas");
         attendanceData = localData ? JSON.parse(localData) : {};
     }
 }
@@ -63,7 +89,7 @@ function handleSave(date, type, status, originalDate) {
     attendanceData[date] = { type, present: status };
     saveToStorage();
     resetForm();
-    alert('Įrašas išsaugotas! (Nepamirškite atsisiųsti JSON)');
+    alert('Įrašas išsaugotas!');
 }
 
 function deleteRecord(date) {
@@ -108,12 +134,17 @@ function setupForm() {
     });
 }
 
-// --- UI ATNAUJINIMAS ---
+// --- UI ATNAUJINIMAS (SU FILTRAIS) ---
 function updateUI() {
-    const dates = Object.keys(attendanceData).sort();
+    const dates = Object.keys(attendanceData).sort().reverse(); // Rikiuojame nuo naujausio
     const tableBody = document.querySelector('#attendance-table tbody');
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     
+    // 1. Gauname filtrų reikšmes
+    const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'all';
+    const filterYear = document.getElementById('filter-year') ? parseInt(document.getElementById('filter-year').value) : 0;
+    const filterMonth = document.getElementById('filter-month') ? parseInt(document.getElementById('filter-month').value) : 0;
+
     if (tableBody) tableBody.innerHTML = '';
 
     let stats = {
@@ -122,40 +153,63 @@ function updateUI() {
         weekday: Array(7).fill(0).map(() => ({ total: 0, present: 0 }))
     };
 
+    let visibleCount = 0;
+
     dates.forEach(date => {
         const rec = attendanceData[date];
         const d = new Date(date);
-        const dayIdx = (d.getDay() + 6) % 7; 
-
-        if (stats[rec.type]) {
-            stats[rec.type].total++;
-            if (rec.present) stats[rec.type].present++;
+        
+        // --- FILTRAVIMO LOGIKA ---
+        let include = false;
+        if (filterType === 'all') {
+            include = true;
+        } else if (filterType === 'year') {
+            if (d.getFullYear() === filterYear) include = true;
+        } else if (filterType === 'month') {
+            if (d.getFullYear() === filterYear && (d.getMonth() + 1) === filterMonth) include = true;
         }
-        if (stats.weekday[dayIdx]) {
-            stats.weekday[dayIdx].total++;
-            if (rec.present) stats.weekday[dayIdx].present++;
+
+        if (include) {
+            visibleCount++;
+            const dayIdx = (d.getDay() + 6) % 7; 
+
+            // Skaičiuojame statistiką tik filtravimą praėjusiems įrašams
+            if (stats[rec.type]) {
+                stats[rec.type].total++;
+                if (rec.present) stats[rec.type].present++;
+            }
+            if (stats.weekday[dayIdx]) {
+                stats.weekday[dayIdx].total++;
+                if (rec.present) stats.weekday[dayIdx].present++;
+            }
+
+            // Piešiame lentelę
+            const actionsHtml = isLoggedIn ? `
+                <td>
+                    <button onclick="startEdit('${date}')" class="action-btn edit-btn">Redaguoti</button>
+                    <button onclick="deleteRecord('${date}')" class="action-btn delete-btn">Ištrinti</button>
+                </td>` : `<td class="admin-col hidden"></td>`;
+
+            const typeLabel = rec.type === 'treniruote' ? 'Treniruotė' : 'Rungtynės';
+            const statusLabel = rec.present ? 'Buvo' : 'Nebuvo';
+            const statusClass = rec.present ? 'status-true' : 'status-false';
+
+            const row = `
+                <tr>
+                    <td>${date}</td>
+                    <td>${LT_DAYS[dayIdx]}</td>
+                    <td>${typeLabel}</td>
+                    <td class="${statusClass}">${statusLabel}</td>
+                    ${actionsHtml}
+                </tr>`;
+            if (tableBody) tableBody.innerHTML += row;
         }
-
-        const actionsHtml = isLoggedIn ? `
-            <td>
-                <button onclick="startEdit('${date}')" class="action-btn edit-btn">Redaguoti</button>
-                <button onclick="deleteRecord('${date}')" class="action-btn delete-btn">Ištrinti</button>
-            </td>` : `<td class="admin-col hidden"></td>`;
-
-        const typeLabel = rec.type === 'treniruote' ? 'Treniruotė' : 'Rungtynės';
-        const statusLabel = rec.present ? 'Buvo' : 'Nebuvo';
-        const statusClass = rec.present ? 'status-true' : 'status-false';
-
-        const row = `
-            <tr>
-                <td>${date}</td>
-                <td>${LT_DAYS[dayIdx]}</td>
-                <td>${typeLabel}</td>
-                <td class="${statusClass}">${statusLabel}</td>
-                ${actionsHtml}
-            </tr>`;
-        if (tableBody) tableBody.innerHTML += row;
     });
+
+    // Jei nėra duomenų pagal filtrą
+    if (visibleCount === 0 && tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px;">Pagal pasirinktus filtrus duomenų nerasta.</td></tr>`;
+    }
 
     updateStatCard('train', stats.treniruote);
     updateStatCard('match', stats.rungtynes);
@@ -180,39 +234,47 @@ function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     const ctx2 = document.getElementById('weekdayChart');
     
-    if (ctx1 && !charts.pie) {
+    // Sunaikiname senus grafikus, kad nepersidengtų animacijos atnaujinant
+    if (charts.pie) charts.pie.destroy();
+    if (charts.bar) charts.bar.destroy();
+
+    if (ctx1) {
         charts.pie = new Chart(ctx1.getContext('2d'), {
             type: 'doughnut',
-            data: { labels: ['Treniruotės', 'Rungtynės'], datasets: [{ data: [], backgroundColor: ['#36a2eb', '#ff6384'] }] },
-            options: { plugins: { title: { display: true, text: 'Lankomumo %' } } }
-        });
-    }
-    if (ctx2 && !charts.bar) {
-        charts.bar = new Chart(ctx2.getContext('2d'), {
-            type: 'bar',
-            data: { labels: LT_DAYS.map(d => d.substring(0,3)), datasets: [{ label: '%', data: [], backgroundColor: '#ffce56' }] },
-            options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { title: { display: true, text: 'Pagal dienas' } } }
+            data: { 
+                labels: ['Treniruotės', 'Rungtynės'], 
+                datasets: [{ 
+                    data: [
+                        (stats.treniruote.present / (stats.treniruote.total || 1)) * 100,
+                        (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100
+                    ], 
+                    backgroundColor: ['#36a2eb', '#ff6384'] 
+                }] 
+            },
+            options: { plugins: { title: { display: true, text: 'Lankomumo % (Pasirinktas laikas)' } } }
         });
     }
 
-    if (charts.pie) {
-        charts.pie.data.datasets[0].data = [
-            (stats.treniruote.present / (stats.treniruote.total || 1)) * 100,
-            (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100
-        ];
-        charts.pie.update();
-    }
-    if (charts.bar) {
-        charts.bar.data.datasets[0].data = stats.weekday.map(d => d.total ? (d.present / d.total * 100) : 0);
-        charts.bar.update();
+    if (ctx2) {
+        charts.bar = new Chart(ctx2.getContext('2d'), {
+            type: 'bar',
+            data: { 
+                labels: LT_DAYS.map(d => d.substring(0,3)), 
+                datasets: [{ 
+                    label: '%', 
+                    data: stats.weekday.map(d => d.total ? (d.present / d.total * 100) : 0), 
+                    backgroundColor: '#ffce56' 
+                }] 
+            },
+            options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { title: { display: true, text: 'Pagal dienas' } } }
+        });
     }
 }
 
 // --- PDF GENERAVIMAS ---
-function showPDFModal() { 
-    document.getElementById('pdf-modal').classList.remove('hidden'); 
-}
+function showPDFModal() { document.getElementById('pdf-modal').classList.remove('hidden'); }
 
+// Šita funkcija valdo PDF modalą (atskira nuo pagrindinių filtrų)
 function togglePdfInputs() {
     const type = document.getElementById('pdf-type').value;
     const yGroup = document.getElementById('pdf-year-group');
@@ -243,14 +305,12 @@ async function loadFont(url) {
     });
 }
 
-// PAGRINDINĖ FUNKCIJA PDF GENERAVIMUI (PATAISYTA)
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     let fontLoaded = false;
 
-    // 1. Šrifto krovimas
     try {
         const fontBase64 = await loadFont(FONT_URL);
         doc.addFileToVFS("Roboto-Regular.ttf", fontBase64);
@@ -264,10 +324,8 @@ async function generatePDF() {
     const type = document.getElementById('pdf-type').value;
     const year = parseInt(document.getElementById('pdf-year').value);
     const month = parseInt(document.getElementById('pdf-month').value);
-    
     const txt = (t) => fontLoaded ? t : sanitizeText(t);
 
-    // 2. Statistikos paruošimas
     let pdfStats = {
         treniruote: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) },
         rungtynes: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) }
@@ -302,12 +360,10 @@ async function generatePDF() {
         }
     });
 
-    // 3. Antraštės
     let subtitle = "";
-    let showNote = false;
-    if (type === 'all') { subtitle = "Viso laiko statistika"; showNote = true; }
-    else if (type === 'year') { subtitle = `${year} metų statistika`; if(year===2025) showNote=true; }
-    else { subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`; if(year===2025 && month===10) showNote=true; }
+    if (type === 'all') subtitle = "Viso laiko statistika";
+    else if (type === 'year') subtitle = `${year} metų statistika`;
+    else subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`;
 
     const pageWidth = doc.internal.pageSize.getWidth();
     doc.setFontSize(18); doc.text(txt("Lankomumo Ataskaita"), pageWidth/2, 15, { align: 'center' });
@@ -315,13 +371,6 @@ async function generatePDF() {
     doc.setFontSize(11); doc.text(txt("Rokas Šipkauskas"), pageWidth/2, 29, { align: 'center' });
 
     let currentY = 35;
-    if (showNote) {
-        doc.setTextColor(200, 0, 0); doc.setFontSize(10);
-        doc.text(txt("* Duomenys pradėti skaičiuoti nuo 2025-10-06"), pageWidth/2, currentY, { align: 'center' });
-        doc.setTextColor(0,0,0); currentY += 10;
-    } else { currentY += 5; }
-
-    // 4. LENTELĖS (PATAISYTA LOGIKA)
     
     // Suvestinė
     const drawSummaryTable = (title, dataKey) => {
@@ -329,10 +378,9 @@ async function generatePDF() {
         const missed = s.total - s.present;
         const pct = s.total ? ((s.present/s.total)*100).toFixed(1) : "0.0";
         
-        // Pirmiausia parašome pavadinimą
         doc.setFontSize(12);
         doc.text(title, 14, currentY); 
-        currentY += 4; // Tarpas po pavadinimo
+        currentY += 4; 
 
         doc.autoTable({
             startY: currentY,
@@ -380,9 +428,9 @@ async function generatePDF() {
     drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Treniruotės"), 'treniruote');
     drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Rungtynės"), 'rungtynes');
 
-    // 5. DETALI LENTELĖ
+    // Detali lentelė
     doc.setFontSize(14);
-    doc.text(txt("Išsami istorija"), pageWidth/2, currentY, { align: 'center' }); // Pataisyta Y
+    doc.text(txt("Išsami istorija"), pageWidth/2, currentY, { align: 'center' });
     currentY += 6;
 
     if (rows.length === 0) {
