@@ -337,7 +337,7 @@ async function generatePDF() {
     let subtitle = "";
     if (type === 'all') subtitle = "Viso laiko statistika"; else if (type === 'year') subtitle = `${year} metų statistika`; else subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`;
     const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFontSize(18); doc.text(txt("Lankomumo Ataskaita"), pageWidth/2, 15, { align: 'center' });
+    doc.setFontSize(18); doc.text(txt("Roko Šipkausko atėjimas į treniruotes"), pageWidth/2, 15, { align: 'center' });
     doc.setFontSize(14); doc.text(txt(subtitle), pageWidth/2, 22, { align: 'center' });
     let currentY = 35;
     const drawSummaryTable = (title, dataKey) => {
