@@ -573,6 +573,62 @@ tbody tr:hover {
 }
 
 /* --- RESPONSIVE --- */
+/* Stilius visiems select laukams ir įvestims */
+.filter-section select, 
+.filter-section input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px; /* 16px apsaugo nuo zoom'inimo iPhone telefonuose */
+}
+
+/* --- MOBILUS IŠDĖSTYMAS --- */
+@media (max-width: 600px) {
+    .filter-section {
+        display: flex;
+        flex-wrap: wrap; /* Įjungiame lankstymą */
+        gap: 10px; /* Tarpai tarp eilučių ir stulpelių */
+    }
+
+    /* 1. Etiketė "Rodyti statistiką" */
+    .filter-section strong {
+        width: 100%; /* Užima visą plotį */
+        margin-bottom: -5px; /* Šiek tiek pritraukiam prie selecto */
+    }
+
+    /* 2. Pagrindinis pasirinkimas (Visas/Metinė/Mėnesinė) - EILUTĖ VIRŠUJE */
+    #filter-type {
+        width: 100%; /* Užima visą plotį */
+        flex-basis: 100%;
+    }
+
+    /* 3. Metai ir Mėnuo - VIENOJE EILUTĖJE */
+    #filter-year-group,
+    #filter-month-group {
+        flex: 1; /* Dalinasi likusią vietą po lygiai (50% / 50%) */
+        min-width: 40%; /* Apsauga, kad nesusispaustų per daug */
+    }
+
+    /* Išplečiame pačius laukelius, kad užpildytų savo pusę eilutės */
+    #filter-year-group select,
+    #filter-year-group input,
+    #filter-month-group select {
+        width: 100%;
+        box-sizing: border-box; /* Įtraukia rėmelius į plotį */
+    }
+
+    /* 4. Mygtukas "Atnaujinti" - per visą plotį apačioje */
+    .btn-update {
+        width: 100%;
+        margin-top: 5px;
+        padding: 10px;
+        background-color: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 4px;
+    }
+}
+
 @media (max-width: 768px) {
   body {
     padding: 12px;
@@ -588,10 +644,7 @@ tbody tr:hover {
     align-items: flex-start;
   }
 
-  .filter-section {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  /* .filter-section stilius perimamas iš @media (max-width: 600px) taisyklės */
 
   .stats-container {
     grid-template-columns: 1fr;
