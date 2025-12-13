@@ -44,14 +44,13 @@ window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
 
-// --- INIT (PAGRINDINĖ LOGIKA) ---
+// --- INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
     
     // 1. Pirmiausia gauname visus duomenis
     await loadData();
 
     // 2. Sugeneruojame filtrus tik iš egzistuojančių duomenų
-    // Ši funkcija automatiškai parinks paskutinį mėnesį
     populateDynamicFilters();
 
     // 3. Priverstinai nustatome filtrą į "month"
@@ -75,16 +74,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
 });
 
-// --- DINAMINIAI FILTRAI (NAUJA FUNKCIJA) ---
+// --- DINAMINIAI FILTRAI ---
 function populateDynamicFilters() {
-    const dates = Object.keys(attendanceData).sort(); // Visos datos
+    const dates = Object.keys(attendanceData).sort(); 
     const yearSelect = document.getElementById('filter-year');
     const monthSelect = document.getElementById('filter-month');
 
-    // Jei elementų nerasta HTML'e, nieko nedarome
     if (!yearSelect || !monthSelect) return;
 
-    // Jei duomenų nėra, įdedame bent jau dabartinius metus/mėnesį
     if (dates.length === 0) {
         const today = new Date();
         const y = today.getFullYear();
@@ -93,21 +90,17 @@ function populateDynamicFilters() {
         return;
     }
 
-    // 1. Sugrupuojame duomenis: { 2024: [Set of months], 2025: [Set of months] }
     const dataMap = {};
     dates.forEach(dateStr => {
         const d = new Date(dateStr);
         const y = d.getFullYear();
-        const m = d.getMonth() + 1; // 1-12
+        const m = d.getMonth() + 1; 
 
         if (!dataMap[y]) dataMap[y] = new Set();
         dataMap[y].add(m);
     });
 
-    // 2. Išvalome metus
     yearSelect.innerHTML = '';
-    
-    // 3. Surikiuojame metus mažėjančia tvarka (naujausi viršuje)
     const sortedYears = Object.keys(dataMap).sort((a, b) => b - a);
 
     sortedYears.forEach(year => {
@@ -117,38 +110,33 @@ function populateDynamicFilters() {
         yearSelect.appendChild(opt);
     });
 
-    // Funkcija mėnesių atnaujinimui
     const updateMonthOptions = (selectedYear) => {
         monthSelect.innerHTML = '';
-        // Gauname mėnesius ir rikiuojame mažėjančia tvarka (naujausi viršuje)
         const monthsInYear = Array.from(dataMap[selectedYear] || []).sort((a, b) => b - a);
         
         monthsInYear.forEach(mIdx => {
             const opt = document.createElement('option');
             opt.value = mIdx;
-            opt.innerText = LT_MONTHS[mIdx - 1]; // Konvertuojame skaičių į pavadinimą
+            opt.innerText = LT_MONTHS[mIdx - 1]; 
             monthSelect.appendChild(opt);
         });
 
-        // Auto-select pirmą (vėliausią) mėnesį
         if (monthsInYear.length > 0) {
             monthSelect.value = monthsInYear[0];
         }
     };
 
-    // 4. Pridedame event listener: keičiant metus, keičiasi mėnesiai
     yearSelect.addEventListener('change', (e) => {
         updateMonthOptions(e.target.value);
         updateUI();
     });
 
-    // 5. Pirminis užpildymas (imame naujausius metus)
     const latestYear = sortedYears[0];
     yearSelect.value = latestYear;
     updateMonthOptions(latestYear);
 }
 
-// ... STANDARTINĖS FUNKCIJOS ...
+// --- STANDARTINĖS FUNKCIJOS ---
 
 function toggleMainFilters() {
     const typeElem = document.getElementById('filter-type');
@@ -158,7 +146,6 @@ function toggleMainFilters() {
     const yGroup = document.getElementById('filter-year-group');
     const mGroup = document.getElementById('filter-month-group');
     
-    // Iš pradžių paslepiame abu
     if (yGroup) yGroup.classList.add('hidden');
     if (mGroup) mGroup.classList.add('hidden');
     
@@ -170,7 +157,6 @@ function toggleMainFilters() {
     }
 }
 
-// --- DUOMENŲ UŽKROVIMAS ---
 async function loadData() {
     attendanceData = {};
     try {
@@ -184,13 +170,11 @@ async function loadData() {
     }
 }
 
-// --- FIREBASE RAŠYMAS ---
 async function saveDataToFirebase(date, data) {
     if (!currentUser) return alert("Neturite teisių! Prisijunkite.");
     try {
         await setDoc(doc(db, DB_COLLECTION, date), data);
         attendanceData[date] = data;
-        // Atnaujiname filtrus, jei atsirado nauji metai/mėnuo
         populateDynamicFilters(); 
         updateUI();
     } catch (e) {
@@ -204,7 +188,7 @@ async function deleteFromFirebase(date) {
     try {
         await deleteDoc(doc(db, DB_COLLECTION, date));
         delete attendanceData[date];
-        populateDynamicFilters(); // Atnaujiname filtrus, gal dingo paskutinis to mėnesio įrašas
+        populateDynamicFilters(); 
         updateUI();
     } catch (e) {
         console.error("Klaida trinant:", e);
@@ -222,7 +206,6 @@ function downloadJSON() {
     dlAnchorElem.remove();
 }
 
-// --- CRUD ---
 async function handleSave(date, type, status, originalDate) {
     if (originalDate && originalDate !== date) {
         await deleteFromFirebase(originalDate);
@@ -274,7 +257,6 @@ function setupForm() {
     });
 }
 
-// --- UI ATNAUJINIMAS ---
 function updateUI() {
     const dates = Object.keys(attendanceData).sort().reverse();
     const tableBody = document.querySelector('#attendance-table tbody');
@@ -282,7 +264,6 @@ function updateUI() {
     
     const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'all';
     
-    // SVARBU: Dabar imame reikšmes iš <select>, todėl jos jau yra tinkamos
     const filterYear = document.getElementById('filter-year') ? parseInt(document.getElementById('filter-year').value) : 0;
     const filterMonth = document.getElementById('filter-month') ? parseInt(document.getElementById('filter-month').value) : 0;
 
@@ -364,6 +345,7 @@ function updateStatCard(id, stat) {
     }
 }
 
+// --- ČIA PAKEISTA CHARTS FUNKCIJA (SUKEISTOS VIETOS) ---
 function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     const ctx2 = document.getElementById('weekdayChart');
@@ -372,7 +354,19 @@ function renderCharts(stats) {
     if (ctx1) {
         charts.pie = new Chart(ctx1.getContext('2d'), {
             type: 'doughnut',
-            data: { labels: ['Treniruotės', 'Rungtynės'], datasets: [{ data: [(stats.treniruote.present / (stats.treniruote.total || 1)) * 100, (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100], backgroundColor: ['#36a2eb', '#ff6384'] }] },
+            data: { 
+                // PAKEISTA: Rungtynės pirmos, Treniruotės antros
+                labels: ['Rungtynės', 'Treniruotės'], 
+                datasets: [{ 
+                    data: [
+                        // PAKEISTA: Rungtynių duomenys pirmi
+                        (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100,
+                        (stats.treniruote.present / (stats.treniruote.total || 1)) * 100
+                    ], 
+                    // PAKEISTA: Spalvų tvarka irgi sukeista (#ff6384 - Raudona, #36a2eb - Mėlyna)
+                    backgroundColor: ['#ff6384', '#36a2eb'] 
+                }] 
+            },
             options: { plugins: { title: { display: true, text: 'Lankomumo % (Pasirinktas laikas)' } } }
         });
     }
@@ -386,8 +380,6 @@ function renderCharts(stats) {
 }
 
 function showPDFModal() { 
-    // PDF Modal atidarymui, pdf laukams paliekame paprastą datą, arba galite naudoti tą pačią dynamic logiką.
-    // Čia supaprastinimui paliekam dabartinę datą defaultui
     const today = new Date();
     document.getElementById('pdf-year').value = today.getFullYear();
     document.getElementById('pdf-month').value = today.getMonth() + 1;
