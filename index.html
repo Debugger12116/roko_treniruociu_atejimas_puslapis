@@ -32,24 +32,13 @@
         </select>
 
         <div id="filter-year-group" class="hidden">
-            <input type="number" id="filter-year" placeholder="Metai">
+            <select id="filter-year" style="padding: 5px; min-width: 80px;">
+                </select>
         </div>
 
         <div id="filter-month-group">
-            <select id="filter-month">
-                <option value="1">Sausis</option>
-                <option value="2">Vasaris</option>
-                <option value="3">Kovas</option>
-                <option value="4">Balandis</option>
-                <option value="5">Gegužė</option>
-                <option value="6">Birželis</option>
-                <option value="7">Liepa</option>
-                <option value="8">Rugpjūtis</option>
-                <option value="9">Rugsėjis</option>
-                <option value="10">Spalis</option>
-                <option value="11">Lapkritis</option>
-                <option value="12">Gruodis</option>
-            </select>
+            <select id="filter-month" style="padding: 5px;">
+                </select>
         </div>
 
         <button onclick="updateUI()" class="btn-update">Atnaujinti</button>
@@ -94,7 +83,7 @@
                 </tr>
             </thead>
             <tbody>
-                </tbody>
+            </tbody>
         </table>
     </div>
 
