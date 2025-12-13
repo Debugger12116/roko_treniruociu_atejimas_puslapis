@@ -345,7 +345,7 @@ function updateStatCard(id, stat) {
     }
 }
 
-// --- ČIA PAKEISTA CHARTS FUNKCIJA (SUKEISTOS VIETOS) ---
+// --- ČIA PAKEISTA CHARTS FUNKCIJA (Rotacija) ---
 function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     const ctx2 = document.getElementById('weekdayChart');
@@ -355,19 +355,26 @@ function renderCharts(stats) {
         charts.pie = new Chart(ctx1.getContext('2d'), {
             type: 'doughnut',
             data: { 
-                // PAKEISTA: Rungtynės pirmos, Treniruotės antros
-                labels: ['Rungtynės', 'Treniruotės'], 
+                // 1. Legenda: Treniruotės (Kairė), Rungtynės (Dešinė)
+                labels: ['Treniruotės', 'Rungtynės'], 
                 datasets: [{ 
+                    // 2. Duomenys: atitinka legendos tvarką
                     data: [
-                        // PAKEISTA: Rungtynių duomenys pirmi
-                        (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100,
-                        (stats.treniruote.present / (stats.treniruote.total || 1)) * 100
+                        (stats.treniruote.present / (stats.treniruote.total || 1)) * 100,
+                        (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100
                     ], 
-                    // PAKEISTA: Spalvų tvarka irgi sukeista (#ff6384 - Raudona, #36a2eb - Mėlyna)
-                    backgroundColor: ['#ff6384', '#36a2eb'] 
+                    // 3. Spalvos: Mėlyna (Treniruotėms), Raudona (Rungtynėms)
+                    backgroundColor: ['#36a2eb', '#ff6384'] 
                 }] 
             },
-            options: { plugins: { title: { display: true, text: 'Lankomumo % (Pasirinktas laikas)' } } }
+            options: { 
+                // 4. SVARBU: Pasukame grafiką -180 laipsnių. 
+                // Taip pirma reikšmė (Treniruotės) prasidės nuo apačios ir užpildys KAIRIĄJĄ pusę.
+                rotation: -180, 
+                plugins: { 
+                    title: { display: true, text: 'Lankomumo % (Pasirinktas laikas)' } 
+                } 
+            }
         });
     }
     if (ctx2) {
