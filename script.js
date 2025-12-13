@@ -44,35 +44,23 @@ window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
 
-// --- INIT (LOGIKA PAKEISTA ČIA) ---
+// --- INIT (PAGRINDINĖ LOGIKA) ---
 document.addEventListener('DOMContentLoaded', async () => {
     
-    // 1. Pirmiausia privalome gauti duomenis, kad žinotume, kada buvo paskutinis įrašas
+    // 1. Pirmiausia gauname visus duomenis
     await loadData();
 
-    // 2. Randame vėliausią datą iš visų turimų įrašų
-    let targetDate = new Date(); // Default: šiandien (jei duomenų visai nėra)
-    
-    // Paimame visus raktus (datas "YYYY-MM-DD") ir surikiuojame
-    const existingDates = Object.keys(attendanceData).sort(); 
+    // 2. Sugeneruojame filtrus tik iš egzistuojančių duomenų
+    // Ši funkcija automatiškai parinks paskutinį mėnesį
+    populateDynamicFilters();
 
-    if (existingDates.length > 0) {
-        // Paimame patį paskutinį masyvo elementą (tai bus vėliausia data)
-        const lastRecordDateString = existingDates[existingDates.length - 1];
-        targetDate = new Date(lastRecordDateString);
-    }
-
-    // 3. Priverstinai nustatome filtrą į "month" (Mėnesinė)
+    // 3. Priverstinai nustatome filtrą į "month"
     const filterTypeElement = document.getElementById('filter-type');
     if (filterTypeElement) {
         filterTypeElement.value = 'month';
     }
 
-    // 4. Užpildome laukus pagal surastą paskutinę datą
-    setupDateInputs('filter-year', 'filter-month', targetDate);
-    setupDateInputs('pdf-year', 'pdf-month', targetDate);
-    
-    // 5. UI atnaujinimas
+    // 4. Parodome/Paslepiame filtrų laukelius
     toggleMainFilters();
 
     // Klausomės, ar vartotojas prisijungęs
@@ -82,18 +70,85 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI();
     });
 
+    // 5. Atvaizduojame lentelę
     updateUI();
     setupForm();
 });
 
-// ... Toliau visos funkcijos lieka tokios pačios ...
+// --- DINAMINIAI FILTRAI (NAUJA FUNKCIJA) ---
+function populateDynamicFilters() {
+    const dates = Object.keys(attendanceData).sort(); // Visos datos
+    const yearSelect = document.getElementById('filter-year');
+    const monthSelect = document.getElementById('filter-month');
 
-function setupDateInputs(yearId, monthId, dateObj) {
-    const yInp = document.getElementById(yearId);
-    const mInp = document.getElementById(monthId);
-    if(yInp) yInp.value = dateObj.getFullYear();
-    if(mInp) mInp.value = dateObj.getMonth() + 1; // +1 nes sausis=0
+    // Jei elementų nerasta HTML'e, nieko nedarome
+    if (!yearSelect || !monthSelect) return;
+
+    // Jei duomenų nėra, įdedame bent jau dabartinius metus/mėnesį
+    if (dates.length === 0) {
+        const today = new Date();
+        const y = today.getFullYear();
+        yearSelect.innerHTML = `<option value="${y}">${y}</option>`;
+        monthSelect.innerHTML = `<option value="${today.getMonth() + 1}">${LT_MONTHS[today.getMonth()]}</option>`;
+        return;
+    }
+
+    // 1. Sugrupuojame duomenis: { 2024: [Set of months], 2025: [Set of months] }
+    const dataMap = {};
+    dates.forEach(dateStr => {
+        const d = new Date(dateStr);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1; // 1-12
+
+        if (!dataMap[y]) dataMap[y] = new Set();
+        dataMap[y].add(m);
+    });
+
+    // 2. Išvalome metus
+    yearSelect.innerHTML = '';
+    
+    // 3. Surikiuojame metus mažėjančia tvarka (naujausi viršuje)
+    const sortedYears = Object.keys(dataMap).sort((a, b) => b - a);
+
+    sortedYears.forEach(year => {
+        const opt = document.createElement('option');
+        opt.value = year;
+        opt.innerText = year;
+        yearSelect.appendChild(opt);
+    });
+
+    // Funkcija mėnesių atnaujinimui
+    const updateMonthOptions = (selectedYear) => {
+        monthSelect.innerHTML = '';
+        // Gauname mėnesius ir rikiuojame mažėjančia tvarka (naujausi viršuje)
+        const monthsInYear = Array.from(dataMap[selectedYear] || []).sort((a, b) => b - a);
+        
+        monthsInYear.forEach(mIdx => {
+            const opt = document.createElement('option');
+            opt.value = mIdx;
+            opt.innerText = LT_MONTHS[mIdx - 1]; // Konvertuojame skaičių į pavadinimą
+            monthSelect.appendChild(opt);
+        });
+
+        // Auto-select pirmą (vėliausią) mėnesį
+        if (monthsInYear.length > 0) {
+            monthSelect.value = monthsInYear[0];
+        }
+    };
+
+    // 4. Pridedame event listener: keičiant metus, keičiasi mėnesiai
+    yearSelect.addEventListener('change', (e) => {
+        updateMonthOptions(e.target.value);
+        updateUI();
+    });
+
+    // 5. Pirminis užpildymas (imame naujausius metus)
+    const latestYear = sortedYears[0];
+    yearSelect.value = latestYear;
+    updateMonthOptions(latestYear);
 }
+
+// ... STANDARTINĖS FUNKCIJOS ...
 
 function toggleMainFilters() {
     const typeElem = document.getElementById('filter-type');
@@ -103,6 +158,7 @@ function toggleMainFilters() {
     const yGroup = document.getElementById('filter-year-group');
     const mGroup = document.getElementById('filter-month-group');
     
+    // Iš pradžių paslepiame abu
     if (yGroup) yGroup.classList.add('hidden');
     if (mGroup) mGroup.classList.add('hidden');
     
@@ -134,10 +190,12 @@ async function saveDataToFirebase(date, data) {
     try {
         await setDoc(doc(db, DB_COLLECTION, date), data);
         attendanceData[date] = data;
+        // Atnaujiname filtrus, jei atsirado nauji metai/mėnuo
+        populateDynamicFilters(); 
         updateUI();
     } catch (e) {
         console.error("Klaida saugant:", e);
-        alert("Nepavyko išsaugoti. Ar esate prisijungęs?");
+        alert("Nepavyko išsaugoti.");
     }
 }
 
@@ -146,6 +204,7 @@ async function deleteFromFirebase(date) {
     try {
         await deleteDoc(doc(db, DB_COLLECTION, date));
         delete attendanceData[date];
+        populateDynamicFilters(); // Atnaujiname filtrus, gal dingo paskutinis to mėnesio įrašas
         updateUI();
     } catch (e) {
         console.error("Klaida trinant:", e);
@@ -222,6 +281,8 @@ function updateUI() {
     const isLoggedIn = !!currentUser; 
     
     const filterType = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'all';
+    
+    // SVARBU: Dabar imame reikšmes iš <select>, todėl jos jau yra tinkamos
     const filterYear = document.getElementById('filter-year') ? parseInt(document.getElementById('filter-year').value) : 0;
     const filterMonth = document.getElementById('filter-month') ? parseInt(document.getElementById('filter-month').value) : 0;
 
@@ -239,9 +300,14 @@ function updateUI() {
         const rec = attendanceData[date];
         const d = new Date(date);
         let include = false;
-        if (filterType === 'all') include = true;
-        else if (filterType === 'year' && d.getFullYear() === filterYear) include = true;
-        else if (filterType === 'month' && d.getFullYear() === filterYear && d.getMonth()+1 === filterMonth) include = true;
+        
+        if (filterType === 'all') {
+            include = true;
+        } else if (filterType === 'year') {
+            if (d.getFullYear() === filterYear) include = true;
+        } else if (filterType === 'month') {
+            if (d.getFullYear() === filterYear && d.getMonth()+1 === filterMonth) include = true;
+        }
 
         if (include) {
             visibleCount++;
@@ -319,7 +385,14 @@ function renderCharts(stats) {
     }
 }
 
-function showPDFModal() { document.getElementById('pdf-modal').classList.remove('hidden'); }
+function showPDFModal() { 
+    // PDF Modal atidarymui, pdf laukams paliekame paprastą datą, arba galite naudoti tą pačią dynamic logiką.
+    // Čia supaprastinimui paliekam dabartinę datą defaultui
+    const today = new Date();
+    document.getElementById('pdf-year').value = today.getFullYear();
+    document.getElementById('pdf-month').value = today.getMonth() + 1;
+    document.getElementById('pdf-modal').classList.remove('hidden'); 
+}
 
 function togglePdfInputs() {
     const type = document.getElementById('pdf-type').value;
