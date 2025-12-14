@@ -1,7 +1,7 @@
 // --- 1. IMPORTUOJAME FIREBASE BIBLIOTEKAS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- 2. FIREBASE KONFIGŪRACIJA ---
 const firebaseConfig = {
@@ -43,36 +43,102 @@ window.closeModal = closeModal;
 window.attemptLogin = attemptLogin;
 window.logout = logout;
 window.resetForm = resetForm;
+window.resetPassword = resetPassword;
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
-    
-    // 1. Pirmiausia gauname visus duomenis
     await loadData();
-
-    // 2. Sugeneruojame filtrus tik iš egzistuojančių duomenų
     populateDynamicFilters();
 
-    // 3. Priverstinai nustatome filtrą į "month"
     const filterTypeElement = document.getElementById('filter-type');
     if (filterTypeElement) {
         filterTypeElement.value = 'month';
     }
 
-    // 4. Parodome/Paslepiame filtrų laukelius
     toggleMainFilters();
 
-    // Klausomės, ar vartotojas prisijungęs
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
         checkSession();
         updateUI();
     });
 
-    // 5. Atvaizduojame lentelę
     updateUI();
     setupForm();
 });
+
+// --- STREAK SKAIČIAVIMAS (ATNAUJINTA SU REKORDAIS) ---
+function calculateStreak() {
+    // 1. Skaičiuojame VISU LAIKŲ REKORDUS
+    // Rikiuojame nuo seniausios iki naujausios (ascending), kad eitume chronologiškai
+    const datesAsc = Object.keys(attendanceData).sort(); 
+    
+    let maxPresent = 0;
+    let currentPresent = 0;
+    
+    let maxAbsent = 0;
+    let currentAbsent = 0;
+
+    datesAsc.forEach(date => {
+        const isPresent = attendanceData[date].present;
+        
+        if (isPresent) {
+            currentPresent++;
+            if (currentPresent > maxPresent) maxPresent = currentPresent;
+            // Nutraukiame "nebuvo" seriją
+            currentAbsent = 0;
+        } else {
+            currentAbsent++;
+            if (currentAbsent > maxAbsent) maxAbsent = currentAbsent;
+            // Nutraukiame "buvo" seriją
+            currentPresent = 0;
+        }
+    });
+
+    // Atnaujiname UI su rekordais
+    const elMaxP = document.getElementById('max-present');
+    const elMaxA = document.getElementById('max-absent');
+    if (elMaxP) elMaxP.innerText = maxPresent;
+    if (elMaxA) elMaxA.innerText = maxAbsent;
+
+
+    // 2. Skaičiuojame DABARTINĘ SERIJĄ
+    // Rikiuojame atvirkščiai (nuo naujausios), kad rastume tai, kas yra dabar
+    const datesDesc = datesAsc.reverse();
+    
+    const streakStat = document.getElementById('streak-stat');
+    const streakDetail = document.getElementById('streak-detail');
+
+    if (datesDesc.length === 0) {
+        streakStat.innerText = "-";
+        streakDetail.innerText = "Nėra duomenų";
+        streakStat.className = "stat-number"; // Nuimame spalvas
+        return;
+    }
+
+    const latestStatus = attendanceData[datesDesc[0]].present;
+    let currentStreakCount = 0;
+
+    for (const date of datesDesc) {
+        if (attendanceData[date].present === latestStatus) {
+            currentStreakCount++;
+        } else {
+            break;
+        }
+    }
+
+    streakStat.innerText = currentStreakCount;
+    streakStat.classList.remove('text-success', 'text-danger');
+
+    if (latestStatus) {
+        streakStat.classList.add('text-success');
+        streakDetail.innerText = "Lankymo serija";
+    } else {
+        streakStat.classList.add('text-danger');
+        streakDetail.innerText = "Praleidimo serija";
+    }
+}
+
 
 // --- DINAMINIAI FILTRAI ---
 function populateDynamicFilters() {
@@ -328,6 +394,10 @@ function updateUI() {
 
     updateStatCard('train', stats.treniruote);
     updateStatCard('match', stats.rungtynes);
+    
+    // ČIA IŠKVIEČIAME STREAK FUNKCIJĄ KIEKVIENĄ KARTĄ ATNAUJINANT UI
+    calculateStreak();
+    
     renderCharts(stats);
     
     document.querySelectorAll('.admin-col').forEach(col => 
@@ -345,7 +415,6 @@ function updateStatCard(id, stat) {
     }
 }
 
-// --- ČIA PAKEISTA CHARTS FUNKCIJA (Rotacija) ---
 function renderCharts(stats) {
     const ctx1 = document.getElementById('attendanceChart');
     const ctx2 = document.getElementById('weekdayChart');
@@ -355,21 +424,16 @@ function renderCharts(stats) {
         charts.pie = new Chart(ctx1.getContext('2d'), {
             type: 'doughnut',
             data: { 
-                // 1. Legenda: Treniruotės (Kairė), Rungtynės (Dešinė)
                 labels: ['Treniruotės', 'Rungtynės'], 
                 datasets: [{ 
-                    // 2. Duomenys: atitinka legendos tvarką
                     data: [
                         (stats.treniruote.present / (stats.treniruote.total || 1)) * 100,
                         (stats.rungtynes.present / (stats.rungtynes.total || 1)) * 100
                     ], 
-                    // 3. Spalvos: Mėlyna (Treniruotėms), Raudona (Rungtynėms)
                     backgroundColor: ['#36a2eb', '#ff6384'] 
                 }] 
             },
             options: { 
-                // 4. SVARBU: Pasukame grafiką -180 laipsnių. 
-                // Taip pirma reikšmė (Treniruotės) prasidės nuo apačios ir užpildys KAIRIĄJĄ pusę.
                 rotation: -180, 
                 plugins: { 
                     title: { display: true, text: 'Lankomumo % (Pasirinktas laikas)' } 
@@ -477,6 +541,26 @@ async function attemptLogin() {
     } catch (error) {
         console.error(error);
         document.getElementById('login-error').innerText = "Klaida: " + error.message;
+    }
+}
+
+async function resetPassword() {
+    const email = document.getElementById('username').value;
+    
+    if (!email) {
+        document.getElementById('login-error').innerText = "Įveskite el. paštą, kad atkurtumėte slaptažodį.";
+        return;
+    }
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)!`);
+    } catch (error) {
+        console.error(error);
+        let msg = "Klaida siunčiant laišką.";
+        if (error.code === 'auth/user-not-found') msg = "Vartotojas nerastas.";
+        if (error.code === 'auth/invalid-email') msg = "Neteisingas el. paštas.";
+        document.getElementById('login-error').innerText = msg;
     }
 }
 

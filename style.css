@@ -215,6 +215,39 @@ header {
   margin-top: 8px;
 }
 
+/* --- STREAK HISTORY (NAUJA DALIS) --- */
+.streak-history {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    text-align: left;
+    color: var(--text-secondary);
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.history-item span {
+    font-weight: 700;
+}
+
+/* Streak Spalvos (Override gradient) */
+.text-success {
+    background: none !important;
+    -webkit-text-fill-color: var(--success) !important;
+    color: var(--success) !important;
+}
+
+.text-danger {
+    background: none !important;
+    -webkit-text-fill-color: var(--danger) !important;
+    color: var(--danger) !important;
+}
+
 /* --- CHARTS --- */
 .charts-wrapper {
   display: grid;
@@ -337,17 +370,14 @@ tbody tr:hover {
   background-color: var(--bg-hover);
 }
 
-/* PAKEISTA: Panaikintas fonas, paliktas tik spalvotas tekstas */
 .status-true {
   color: var(--success);
-  font-weight: 700; /* Paryškinta */
-  /* background-color, padding, border-radius - ištrinti */
+  font-weight: 700; 
 }
 
 .status-false {
   color: var(--danger);
-  font-weight: 700; /* Paryškinta */
-  /* background-color, padding, border-radius - ištrinti */
+  font-weight: 700; 
 }
 
 .action-btn {
@@ -579,45 +609,40 @@ tbody tr:hover {
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    font-size: 16px; /* 16px apsaugo nuo zoom'inimo iPhone telefonuose */
+    font-size: 16px; 
 }
 
 /* --- MOBILUS IŠDĖSTYMAS --- */
 @media (max-width: 600px) {
     .filter-section {
         display: flex;
-        flex-wrap: wrap; /* Įjungiame lankstymą */
-        gap: 10px; /* Tarpai tarp eilučių ir stulpelių */
+        flex-wrap: wrap; 
+        gap: 10px;
     }
 
-    /* 1. Etiketė "Rodyti statistiką" */
     .filter-section strong {
-        width: 100%; /* Užima visą plotį */
-        margin-bottom: -5px; /* Šiek tiek pritraukiam prie selecto */
+        width: 100%; 
+        margin-bottom: -5px; 
     }
 
-    /* 2. Pagrindinis pasirinkimas (Visas/Metinė/Mėnesinė) - EILUTĖ VIRŠUJE */
     #filter-type {
-        width: 100%; /* Užima visą plotį */
+        width: 100%; 
         flex-basis: 100%;
     }
 
-    /* 3. Metai ir Mėnuo - VIENOJE EILUTĖJE */
     #filter-year-group,
     #filter-month-group {
-        flex: 1; /* Dalinasi likusią vietą po lygiai (50% / 50%) */
-        min-width: 40%; /* Apsauga, kad nesusispaustų per daug */
+        flex: 1; 
+        min-width: 40%;
     }
 
-    /* Išplečiame pačius laukelius, kad užpildytų savo pusę eilutės */
     #filter-year-group select,
     #filter-year-group input,
     #filter-month-group select {
         width: 100%;
-        box-sizing: border-box; /* Įtraukia rėmelius į plotį */
+        box-sizing: border-box; 
     }
 
-    /* 4. Mygtukas "Atnaujinti" - per visą plotį apačioje */
     .btn-update {
         width: 100%;
         margin-top: 5px;
@@ -643,8 +668,6 @@ tbody tr:hover {
     gap: 16px;
     align-items: flex-start;
   }
-
-  /* .filter-section stilius perimamas iš @media (max-width: 600px) taisyklės */
 
   .stats-container {
     grid-template-columns: 1fr;
