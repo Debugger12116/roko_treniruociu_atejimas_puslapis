@@ -14,7 +14,7 @@ const firebaseConfig = {
   measurementId: "G-6BQFEEP9X8"
 };
 
-// --- 3. INICIJUOJAME SISTEMAS --- //
+// --- 3. INICIJUOJAME SISTEMAS ---
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -67,12 +67,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
 });
 
-// --- STREAK SKAIČIAVIMAS (ATNAUJINTA SU REKORDAIS) ---
-function calculateStreak() {
-    // 1. Skaičiuojame VISU LAIKŲ REKORDUS
-    // Rikiuojame nuo seniausios iki naujausios (ascending), kad eitume chronologiškai
-    const datesAsc = Object.keys(attendanceData).sort(); 
-    
+// --- STREAK SKAIČIAVIMAS (NAUJA VERSIJA SU FILTRAVIMU) ---
+function calculateStreak(filteredDatesDesc) {
+    const streakStat = document.getElementById('streak-stat');
+    const streakDetail = document.getElementById('streak-detail');
+    const elMaxP = document.getElementById('max-present');
+    const elMaxA = document.getElementById('max-absent');
+
+    // Jei nėra duomenų (pagal filtrą)
+    if (!filteredDatesDesc || filteredDatesDesc.length === 0) {
+        streakStat.innerText = "-";
+        streakDetail.innerText = "Nėra duomenų";
+        streakStat.className = "stat-number"; 
+        if (elMaxP) elMaxP.innerText = 0;
+        if (elMaxA) elMaxA.innerText = 0;
+        return;
+    }
+
+    // 1. REKORDAI (Pagal filtrą)
+    // Mums reikia datų chronologine tvarka (Ascending)
+    const datesAsc = [...filteredDatesDesc].reverse();
+
     let maxPresent = 0;
     let currentPresent = 0;
     
@@ -85,41 +100,25 @@ function calculateStreak() {
         if (isPresent) {
             currentPresent++;
             if (currentPresent > maxPresent) maxPresent = currentPresent;
-            // Nutraukiame "nebuvo" seriją
             currentAbsent = 0;
         } else {
             currentAbsent++;
             if (currentAbsent > maxAbsent) maxAbsent = currentAbsent;
-            // Nutraukiame "buvo" seriją
             currentPresent = 0;
         }
     });
 
-    // Atnaujiname UI su rekordais
-    const elMaxP = document.getElementById('max-present');
-    const elMaxA = document.getElementById('max-absent');
     if (elMaxP) elMaxP.innerText = maxPresent;
     if (elMaxA) elMaxA.innerText = maxAbsent;
 
 
-    // 2. Skaičiuojame DABARTINĘ SERIJĄ
-    // Rikiuojame atvirkščiai (nuo naujausios), kad rastume tai, kas yra dabar
-    const datesDesc = datesAsc.reverse();
-    
-    const streakStat = document.getElementById('streak-stat');
-    const streakDetail = document.getElementById('streak-detail');
-
-    if (datesDesc.length === 0) {
-        streakStat.innerText = "-";
-        streakDetail.innerText = "Nėra duomenų";
-        streakStat.className = "stat-number"; // Nuimame spalvas
-        return;
-    }
-
-    const latestStatus = attendanceData[datesDesc[0]].present;
+    // 2. DABARTINĖ SERIJA (Pagal filtrą)
+    // Naudojame Descending masyvą (naujausi viršuje)
+    const latestDate = filteredDatesDesc[0];
+    const latestStatus = attendanceData[latestDate].present;
     let currentStreakCount = 0;
 
-    for (const date of datesDesc) {
+    for (const date of filteredDatesDesc) {
         if (attendanceData[date].present === latestStatus) {
             currentStreakCount++;
         } else {
@@ -132,10 +131,10 @@ function calculateStreak() {
 
     if (latestStatus) {
         streakStat.classList.add('text-success');
-        streakDetail.innerText = "Lankymo serija";
+        streakDetail.innerText = "Lankymo serija 🔥";
     } else {
         streakStat.classList.add('text-danger');
-        streakDetail.innerText = "Praleidimo serija";
+        streakDetail.innerText = "Praleidimo serija 😔";
     }
 }
 
@@ -342,6 +341,9 @@ function updateUI() {
     };
 
     let visibleCount = 0;
+    
+    // Naujas masyvas filtruotiems duomenims rinkti
+    let filteredDates = [];
 
     dates.forEach(date => {
         const rec = attendanceData[date];
@@ -357,6 +359,9 @@ function updateUI() {
         }
 
         if (include) {
+            // Pridedame į filtruotų datų masyvą
+            filteredDates.push(date);
+
             visibleCount++;
             const dayIdx = (d.getDay() + 6) % 7; 
             if (stats[rec.type]) {
@@ -395,8 +400,8 @@ function updateUI() {
     updateStatCard('train', stats.treniruote);
     updateStatCard('match', stats.rungtynes);
     
-    // ČIA IŠKVIEČIAME STREAK FUNKCIJĄ KIEKVIENĄ KARTĄ ATNAUJINANT UI
-    calculateStreak();
+    // ČIA IŠKVIEČIAME STREAK FUNKCIJĄ SU FILTRUOTAIS DUOMENIMIS
+    calculateStreak(filteredDates);
     
     renderCharts(stats);
     
