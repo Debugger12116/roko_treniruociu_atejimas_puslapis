@@ -14,7 +14,7 @@ const firebaseConfig = {
   measurementId: "G-6BQFEEP9X8"
 };
 
-// --- 3. INICIJUOJAME SISTEMAS ---
+// --- 3. INICIJUOJAME SISTEMAS --- //
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
