@@ -559,7 +559,7 @@ async function resetPassword() {
 
     try {
         await sendPasswordResetEmail(auth, email);
-        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)!`);
+        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)`);
     } catch (error) {
         console.error(error);
         let msg = "Klaida siunčiant laišką.";
