@@ -67,25 +67,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
 });
 
-// --- STREAK SKAIČIAVIMAS (NAUJA VERSIJA SU FILTRAVIMU) ---
+// --- STREAK SKAIČIAVIMAS (SU DINAMINIAIS PAVADINIMAIS) ---
 function calculateStreak(filteredDatesDesc) {
     const streakStat = document.getElementById('streak-stat');
     const streakDetail = document.getElementById('streak-detail');
     const elMaxP = document.getElementById('max-present');
     const elMaxA = document.getElementById('max-absent');
+    const lblMaxP = document.getElementById('lbl-max-present');
+    const lblMaxA = document.getElementById('lbl-max-absent');
 
-    // Jei nėra duomenų (pagal filtrą)
-    if (!filteredDatesDesc || filteredDatesDesc.length === 0) {
+    // 1. Nustatome etikečių tekstą pagal filtrą
+    const filterType = document.getElementById('filter-type').value;
+    const filterYear = document.getElementById('filter-year').value;
+    const filterMonth = document.getElementById('filter-month').value;
+    
+    let suffix = "Visas laikas";
+    if (filterType === 'year') {
+        suffix = `${filterYear} m.`;
+    } else if (filterType === 'month') {
+        // filterMonth value yra 1-12, LT_MONTHS masyvas 0-11
+        const mName = LT_MONTHS[parseInt(filterMonth) - 1] || "";
+        suffix = `${mName}`; 
+    }
+
+    if (lblMaxP) lblMaxP.innerText = `Rekordas (${suffix})`;
+    if (lblMaxA) lblMaxA.innerText = `Rekordas (${suffix})`;
+
+
+    // 2. DABARTINĖ SERIJA (Iš VISŲ duomenų)
+    const allDatesDesc = Object.keys(attendanceData).sort().reverse();
+
+    if (allDatesDesc.length > 0) {
+        const latestDate = allDatesDesc[0];
+        const latestStatus = attendanceData[latestDate].present;
+        let currentStreakCount = 0;
+
+        for (const date of allDatesDesc) {
+            if (attendanceData[date].present === latestStatus) {
+                currentStreakCount++;
+            } else {
+                break;
+            }
+        }
+
+        streakStat.innerText = currentStreakCount;
+        streakStat.classList.remove('text-success', 'text-danger');
+
+        if (latestStatus) {
+            streakStat.classList.add('text-success');
+            streakDetail.innerText = "Lankymo serija";
+        } else {
+            streakStat.classList.add('text-danger');
+            streakDetail.innerText = "Praleidimo serija";
+        }
+    } else {
         streakStat.innerText = "-";
         streakDetail.innerText = "Nėra duomenų";
         streakStat.className = "stat-number"; 
+    }
+
+
+    // 3. REKORDAI (Tik iš FILTRUOTŲ duomenų)
+    if (!filteredDatesDesc || filteredDatesDesc.length === 0) {
         if (elMaxP) elMaxP.innerText = 0;
         if (elMaxA) elMaxA.innerText = 0;
         return;
     }
 
-    // 1. REKORDAI (Pagal filtrą)
-    // Mums reikia datų chronologine tvarka (Ascending)
     const datesAsc = [...filteredDatesDesc].reverse();
 
     let maxPresent = 0;
@@ -110,32 +158,6 @@ function calculateStreak(filteredDatesDesc) {
 
     if (elMaxP) elMaxP.innerText = maxPresent;
     if (elMaxA) elMaxA.innerText = maxAbsent;
-
-
-    // 2. DABARTINĖ SERIJA (Pagal filtrą)
-    // Naudojame Descending masyvą (naujausi viršuje)
-    const latestDate = filteredDatesDesc[0];
-    const latestStatus = attendanceData[latestDate].present;
-    let currentStreakCount = 0;
-
-    for (const date of filteredDatesDesc) {
-        if (attendanceData[date].present === latestStatus) {
-            currentStreakCount++;
-        } else {
-            break;
-        }
-    }
-
-    streakStat.innerText = currentStreakCount;
-    streakStat.classList.remove('text-success', 'text-danger');
-
-    if (latestStatus) {
-        streakStat.classList.add('text-success');
-        streakDetail.innerText = "Lankymo serija 🔥";
-    } else {
-        streakStat.classList.add('text-danger');
-        streakDetail.innerText = "Praleidimo serija 😔";
-    }
 }
 
 
@@ -342,7 +364,6 @@ function updateUI() {
 
     let visibleCount = 0;
     
-    // Naujas masyvas filtruotiems duomenims rinkti
     let filteredDates = [];
 
     dates.forEach(date => {
@@ -359,7 +380,6 @@ function updateUI() {
         }
 
         if (include) {
-            // Pridedame į filtruotų datų masyvą
             filteredDates.push(date);
 
             visibleCount++;
@@ -400,7 +420,6 @@ function updateUI() {
     updateStatCard('train', stats.treniruote);
     updateStatCard('match', stats.rungtynes);
     
-    // ČIA IŠKVIEČIAME STREAK FUNKCIJĄ SU FILTRUOTAIS DUOMENIMIS
     calculateStreak(filteredDates);
     
     renderCharts(stats);
@@ -559,7 +578,7 @@ async function resetPassword() {
 
     try {
         await sendPasswordResetEmail(auth, email);
-        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)`);
+        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)!`);
     } catch (error) {
         console.error(error);
         let msg = "Klaida siunčiant laišką.";
