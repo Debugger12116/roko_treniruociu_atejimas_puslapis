@@ -1,5 +1,5 @@
 // --- 1. IMPORTUOJAME FIREBASE BIBLIOTEKAS ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"; // test
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
