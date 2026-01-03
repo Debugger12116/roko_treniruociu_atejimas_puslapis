@@ -492,10 +492,12 @@ async function loadFont(url) {
     return new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(blob); });
 }
 
-// --- GENERUOTI PDF (ATNAUJINTA SU ĮSPĖJIMU) ---
+// --- GENERUOTI PDF (SU ĮRAŠŲ PATIKRINIMU) ---
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
+    
+    // Čia tik paruošiamieji darbai
     const doc = new jsPDF();
     let fontLoaded = false;
     try { const fontBase64 = await loadFont(FONT_URL); doc.addFileToVFS("Roboto-Regular.ttf", fontBase64); doc.addFont("Roboto-Regular.ttf", "Roboto", "normal"); doc.setFont("Roboto"); fontLoaded = true; } catch (e) { console.warn("Šriftas nerastas."); }
@@ -507,16 +509,11 @@ async function generatePDF() {
 
     // --- LOGIKA ĮSPĖJIMUI ---
     let showDisclaimer = false;
-    // 1. Visas laikas
     if (type === 'all') {
         showDisclaimer = true;
-    } 
-    // 2. Metai (jei 2025 ar seniau)
-    else if (type === 'year') {
+    } else if (type === 'year') {
         if (year <= 2025) showDisclaimer = true;
-    } 
-    // 3. Mėnuo (jei 2025 spalis ar seniau)
-    else if (type === 'month') {
+    } else if (type === 'month') {
         if (year < 2025) {
             showDisclaimer = true;
         } else if (year === 2025) {
@@ -524,12 +521,15 @@ async function generatePDF() {
         }
     }
 
+    // --- 1. SURENKAME DUOMENIS (kad patikrintume ar jų yra) ---
     let pdfStats = { treniruote: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) }, rungtynes: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) } };
     const rows = [];
+    
     Object.keys(attendanceData).sort().forEach(date => {
         const d = new Date(date);
         let include = false;
         if (type === 'all') include = true; else if (type === 'year' && d.getFullYear() === year) include = true; else if (type === 'month' && d.getFullYear() === year && d.getMonth()+1 === month) include = true;
+        
         if (include) {
             const rec = attendanceData[date];
             const dayIdx = (d.getDay() + 6) % 7;
@@ -540,6 +540,14 @@ async function generatePDF() {
         }
     });
 
+    // --- 2. PATIKRINIMAS: AR YRA DUOMENŲ? ---
+    if (rows.length === 0) {
+        alert("Pasirinktu laikotarpiu įrašų nerasta, todėl ataskaita nebus generuojama.");
+        closeModal('pdf-modal'); 
+        return; 
+    }
+
+    // --- 3. JEI DUOMENŲ YRA, TĘSIAME ---
     let subtitle = "";
     if (type === 'all') subtitle = "Viso laiko statistika"; else if (type === 'year') subtitle = `${year} metų statistika`; else subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`;
     
@@ -549,13 +557,12 @@ async function generatePDF() {
     
     let currentY = 35;
 
-    // --- ĮRAŠYTI ĮSPĖJIMĄ, JEI REIKIA ---
     if (showDisclaimer) {
         doc.setFontSize(10);
-        doc.setTextColor(220, 53, 69); // Raudona spalva
+        doc.setTextColor(220, 53, 69);
         doc.text(txt("* Informacija iki 2025 spalio 6 d. gali neatitikti realybės ir būti klaidinga."), pageWidth / 2, currentY, { align: 'center' });
-        doc.setTextColor(0, 0, 0); // Grąžiname juodą spalvą
-        currentY += 8; // Pridedame tarpą
+        doc.setTextColor(0, 0, 0);
+        currentY += 8;
     }
 
     const drawSummaryTable = (title, dataKey) => {
@@ -570,9 +577,9 @@ async function generatePDF() {
     };
     drawSummaryTable(txt("Treniruotės"), 'treniruote'); drawSummaryTable(txt("Rungtynės"), 'rungtynes'); drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Treniruotės"), 'treniruote'); drawWeekdayTable(txt("Lankomumas pagal savaitės dienas – Rungtynės"), 'rungtynes');
     doc.setFontSize(14); doc.text(txt("Išsami istorija"), pageWidth/2, currentY, { align: 'center' }); currentY += 6;
-    if (rows.length === 0) { doc.setFontSize(10); doc.text(txt("Įrašų nerasta."), pageWidth/2, currentY, { align: 'center' }); } else {
-        doc.autoTable({ startY: currentY, head: [[txt('Data'), txt('Diena'), txt('Tipas'), txt('Buvo')]], body: rows, theme: 'striped', styles: { font: fontLoaded ? "Roboto" : "helvetica", halign: 'center' }, headStyles: { fillColor: [44, 62, 80], textColor: [255,255,255] }, didParseCell: function(data) { if (data.section === 'body' && data.column.index === 3) { if (data.cell.raw === 'Ne' || data.cell.raw === 'ne' || data.cell.raw === txt('Ne')) { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; } else { data.cell.styles.textColor = [0, 100, 0]; } } } });
-    }
+    
+    doc.autoTable({ startY: currentY, head: [[txt('Data'), txt('Diena'), txt('Tipas'), txt('Buvo')]], body: rows, theme: 'striped', styles: { font: fontLoaded ? "Roboto" : "helvetica", halign: 'center' }, headStyles: { fillColor: [44, 62, 80], textColor: [255,255,255] }, didParseCell: function(data) { if (data.section === 'body' && data.column.index === 3) { if (data.cell.raw === 'Ne' || data.cell.raw === 'ne' || data.cell.raw === txt('Ne')) { data.cell.styles.textColor = [200, 0, 0]; data.cell.styles.fontStyle = 'bold'; } else { data.cell.styles.textColor = [0, 100, 0]; } } } });
+
     doc.save(`lankomumas_${type}.pdf`); closeModal('pdf-modal');
 }
 
@@ -620,11 +627,24 @@ async function logout() {
     }
 }
 
+// --- CHECK SESSION (PAKEISTA, KAD VALDYTŲ JSON MYGTUKĄ) ---
 function checkSession() {
     const isLoggedIn = !!currentUser;
+    
+    // Valdome Admin panelės matomumą
     if(document.getElementById('admin-panel')) {
         document.getElementById('admin-panel').classList.toggle('hidden', !isLoggedIn);
         document.getElementById('login-btn').classList.toggle('hidden', isLoggedIn);
         document.getElementById('logout-btn').classList.toggle('hidden', !isLoggedIn);
+    }
+
+    // Valdome JSON mygtuko matomumą
+    const jsonBtn = document.getElementById('btn-download-json');
+    if (jsonBtn) {
+        if (isLoggedIn) {
+            jsonBtn.classList.remove('hidden');
+        } else {
+            jsonBtn.classList.add('hidden');
+        }
     }
 }
