@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
 });
 
-// --- STREAK SKAIČIAVIMAS (SU DINAMINIAIS PAVADINIMAIS) ---
+// --- STREAK SKAIČIAVIMAS ---
 function calculateStreak(filteredDatesDesc) {
     const streakStat = document.getElementById('streak-stat');
     const streakDetail = document.getElementById('streak-detail');
@@ -76,7 +76,6 @@ function calculateStreak(filteredDatesDesc) {
     const lblMaxP = document.getElementById('lbl-max-present');
     const lblMaxA = document.getElementById('lbl-max-absent');
 
-    // 1. Nustatome etikečių tekstą pagal filtrą
     const filterType = document.getElementById('filter-type').value;
     const filterYear = document.getElementById('filter-year').value;
     const filterMonth = document.getElementById('filter-month').value;
@@ -85,7 +84,6 @@ function calculateStreak(filteredDatesDesc) {
     if (filterType === 'year') {
         suffix = `${filterYear} m.`;
     } else if (filterType === 'month') {
-        // filterMonth value yra 1-12, LT_MONTHS masyvas 0-11
         const mName = LT_MONTHS[parseInt(filterMonth) - 1] || "";
         suffix = `${mName}`; 
     }
@@ -93,8 +91,7 @@ function calculateStreak(filteredDatesDesc) {
     if (lblMaxP) lblMaxP.innerText = `Rekordas (${suffix})`;
     if (lblMaxA) lblMaxA.innerText = `Rekordas (${suffix})`;
 
-
-    // 2. DABARTINĖ SERIJA (Iš VISŲ duomenų)
+    // 1. DABARTINĖ SERIJA
     const allDatesDesc = Object.keys(attendanceData).sort().reverse();
 
     if (allDatesDesc.length > 0) {
@@ -126,8 +123,7 @@ function calculateStreak(filteredDatesDesc) {
         streakStat.className = "stat-number"; 
     }
 
-
-    // 3. REKORDAI (Tik iš FILTRUOTŲ duomenų)
+    // 2. REKORDAI
     if (!filteredDatesDesc || filteredDatesDesc.length === 0) {
         if (elMaxP) elMaxP.innerText = 0;
         if (elMaxA) elMaxA.innerText = 0;
@@ -135,16 +131,13 @@ function calculateStreak(filteredDatesDesc) {
     }
 
     const datesAsc = [...filteredDatesDesc].reverse();
-
     let maxPresent = 0;
     let currentPresent = 0;
-    
     let maxAbsent = 0;
     let currentAbsent = 0;
 
     datesAsc.forEach(date => {
         const isPresent = attendanceData[date].present;
-        
         if (isPresent) {
             currentPresent++;
             if (currentPresent > maxPresent) maxPresent = currentPresent;
@@ -363,7 +356,6 @@ function updateUI() {
     };
 
     let visibleCount = 0;
-    
     let filteredDates = [];
 
     dates.forEach(date => {
@@ -381,7 +373,6 @@ function updateUI() {
 
         if (include) {
             filteredDates.push(date);
-
             visibleCount++;
             const dayIdx = (d.getDay() + 6) % 7; 
             if (stats[rec.type]) {
@@ -419,9 +410,7 @@ function updateUI() {
 
     updateStatCard('train', stats.treniruote);
     updateStatCard('match', stats.rungtynes);
-    
     calculateStreak(filteredDates);
-    
     renderCharts(stats);
     
     document.querySelectorAll('.admin-col').forEach(col => 
@@ -503,16 +492,38 @@ async function loadFont(url) {
     return new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.readAsDataURL(blob); });
 }
 
+// --- GENERUOTI PDF (ATNAUJINTA SU ĮSPĖJIMU) ---
 async function generatePDF() {
     if (!window.jspdf) return alert("Klaida: biblioteka neužsikrovė.");
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     let fontLoaded = false;
     try { const fontBase64 = await loadFont(FONT_URL); doc.addFileToVFS("Roboto-Regular.ttf", fontBase64); doc.addFont("Roboto-Regular.ttf", "Roboto", "normal"); doc.setFont("Roboto"); fontLoaded = true; } catch (e) { console.warn("Šriftas nerastas."); }
+    
     const type = document.getElementById('pdf-type').value;
     const year = parseInt(document.getElementById('pdf-year').value);
     const month = parseInt(document.getElementById('pdf-month').value);
     const txt = (t) => fontLoaded ? t : sanitizeText(t);
+
+    // --- LOGIKA ĮSPĖJIMUI ---
+    let showDisclaimer = false;
+    // 1. Visas laikas
+    if (type === 'all') {
+        showDisclaimer = true;
+    } 
+    // 2. Metai (jei 2025 ar seniau)
+    else if (type === 'year') {
+        if (year <= 2025) showDisclaimer = true;
+    } 
+    // 3. Mėnuo (jei 2025 spalis ar seniau)
+    else if (type === 'month') {
+        if (year < 2025) {
+            showDisclaimer = true;
+        } else if (year === 2025) {
+            if (month <= 10) showDisclaimer = true;
+        }
+    }
+
     let pdfStats = { treniruote: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) }, rungtynes: { total: 0, present: 0, days: Array(7).fill(0).map(()=>({t:0, p:0})) } };
     const rows = [];
     Object.keys(attendanceData).sort().forEach(date => {
@@ -528,12 +539,25 @@ async function generatePDF() {
             rows.push([date, txt(LT_DAYS[dayIdx]), txt(rec.type === 'treniruote' ? 'Treniruotė' : 'Rungtynės'), txt(rec.present ? "Taip" : "Ne")]);
         }
     });
+
     let subtitle = "";
     if (type === 'all') subtitle = "Viso laiko statistika"; else if (type === 'year') subtitle = `${year} metų statistika`; else subtitle = `${year} m. ${LT_MONTHS[month-1]} statistika`;
+    
     const pageWidth = doc.internal.pageSize.getWidth();
     doc.setFontSize(18); doc.text(txt("Roko Šipkausko atėjimas į treniruotes"), pageWidth/2, 15, { align: 'center' });
     doc.setFontSize(14); doc.text(txt(subtitle), pageWidth/2, 22, { align: 'center' });
+    
     let currentY = 35;
+
+    // --- ĮRAŠYTI ĮSPĖJIMĄ, JEI REIKIA ---
+    if (showDisclaimer) {
+        doc.setFontSize(10);
+        doc.setTextColor(220, 53, 69); // Raudona spalva
+        doc.text(txt("* Informacija iki 2025 spalio 6 d. gali neatitikti realybės ir būti klaidinga."), pageWidth / 2, currentY, { align: 'center' });
+        doc.setTextColor(0, 0, 0); // Grąžiname juodą spalvą
+        currentY += 8; // Pridedame tarpą
+    }
+
     const drawSummaryTable = (title, dataKey) => {
         const s = pdfStats[dataKey]; const missed = s.total - s.present; const pct = s.total ? ((s.present/s.total)*100).toFixed(1) : "0.0";
         doc.setFontSize(12); doc.text(title, 14, currentY); currentY += 4;
@@ -578,7 +602,7 @@ async function resetPassword() {
 
     try {
         await sendPasswordResetEmail(auth, email);
-        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}.`);
+        alert(`Slaptažodžio atkūrimo laiškas išsiųstas į ${email}. Patikrinkite paštą (ir Spam aplanką)!`);
     } catch (error) {
         console.error(error);
         let msg = "Klaida siunčiant laišką.";
